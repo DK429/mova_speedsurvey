@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MOVA SPEED SURVEY — 3 Tabs (Results gated by End Survey + Quality badge)</title>
+<title>MOVA SPEED SURVEY — Quality badge + compact canvas + timer under samples</title>
 <style>
   body { font-family: Arial, sans-serif; margin: 20px; }
   h2 { text-align:center; margin-top: 0; }
@@ -63,20 +63,22 @@
   .metric .label { font-weight:bold; }
   .metric .value { min-width: 150px; text-align: right; }
 
+  /* Top metrics bar now stacks vertically (Samples on first line, Timer under) */
   .metrics-bar-top {
     max-width: 460px;
     margin: 4px auto 8px;
     padding: 8px 10px;
     border-bottom: 1px solid #ccc;
     display: flex;
-    justify-content: space-between;
-    gap: 24px;
-    align-items: baseline;
+    flex-direction: column;
+    gap: 4px;
+    align-items: flex-start; /* left */
     font-family: monospace;
   }
-  .metrics-bar-top .value { min-width: 60px; text-align: right; }
+  .metrics-row { display: flex; gap: 24px; align-items: baseline; width: 100%; }
+  .metrics-bar-top .value { min-width: 60px; text-align: left; }
 
-  /* Canvas wrapper and quality badge */
+  /* Canvas wrapper and quality badge (now left side) */
   .canvas-wrap {
     position: relative;
     display: inline-block;
@@ -84,7 +86,7 @@
   .quality-badge {
     position: absolute;
     top: 8px;
-    right: 8px;
+    left: 8px; /* moved from right to left */
     padding: 4px 8px;
     border-radius: 12px;
     font-family: monospace;
@@ -147,13 +149,19 @@
     <fieldset>
       <legend>Measurement</legend>
 
+      <!-- Stacked metrics: Samples on first line, Timer under it (left) -->
       <div class="metrics-bar-top" aria-live="polite">
-        <div class="metric"><span class="label">Samples:</span><span class="value" id="countMetric">0</span></div>
-        <div class="metric"><span class="label">Timer:</span><span class="value" id="timerMetric">0.00 s</span></div>
+        <div class="metrics-row">
+          <div class="metric"><span class="label">Samples:</span><span class="value" id="countMetric">0</span></div>
+        </div>
+        <div class="metrics-row">
+          <div class="metric"><span class="label">Timer:</span><span class="value" id="timerMetric">0.00 s</span></div>
+        </div>
       </div>
 
       <div class="canvas-wrap">
-        <canvas id="canvas" width="460" height="300"></canvas>
+        <!-- Canvas height reduced 300 -> 210 -->
+        <canvas id="canvas" width="460" height="210"></canvas>
         <span id="qualityBadge" class="quality-badge">Quality: —</span>
       </div>
 
@@ -284,13 +292,10 @@ function formIsValid() { return validateFields(); }
 /* Gating */
 function updateTabVisibility() {
   var detailsOK = formIsValid();
-
   setDisabled(measureTabBtn, !detailsOK);
   setDisabled(gotoMeasureBtn, !detailsOK);
   detailsHint.textContent = detailsOK ? 'Details complete. Proceed to Measurements.' : 'Fill all fields to unlock Measurements.';
-
   setDisabled(resultsTabBtn, !resultsUnlocked);
-
   if (!detailsOK && (measureTabBtn.classList.contains('active') || resultsTabBtn.classList.contains('active'))) {
     showTab('detailsTab');
   }
