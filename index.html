@@ -3,17 +3,24 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MOVA SPEED SURVEY — Responsive canvas + safe intro message</title>
+<title>MOVA SPEED SURVEY — Aligned Results + TXT Export</title>
 <style>
   body { font-family: Arial, sans-serif; margin: 20px; }
   h2 { text-align:center; margin-top: 0; }
 
-  /* Tabs */
-  .tabs { display: flex; justify-content: center; margin: 0 auto 14px; max-width: 920px; gap: 6px; }
+  /* Tabs full width */
+  .tabs { display: flex; width: 100%; margin: 0 0 14px 0; gap: 0; }
   .tab-btn {
-    padding: 10px 16px; border: 1px solid #999; background:#f5f5f5; cursor:pointer;
-    border-radius:6px 6px 0 0; font-weight:bold;
+    flex: 1 1 0;
+    padding: 10px 8px;
+    border: 1px solid #999;
+    background:#f5f5f5;
+    cursor:pointer;
+    border-radius:6px 6px 0 0;
+    font-weight:bold;
+    text-align:center;
   }
+  .tab-btn + .tab-btn { border-left-width: 0; }
   .tab-btn[disabled] { opacity: 0.5; cursor: not-allowed; }
   .tab-btn.active { background:#fff; border-bottom-color: #fff; }
   .tab-content {
@@ -30,7 +37,10 @@
   input.invalid { border:2px solid #e00; background:#fff8f8; }
   .error-msg { color:#b00020; font-size:14px; margin:6px 0 0 0; display:none; }
   .error-msg.show { display:block; }
-  /* Make canvas responsive: width:100% with preserved aspect ratio via JS */
+  .helper { text-align:center; color:#444; margin: 8px 0; }
+  .helper.one-line { white-space: nowrap; font-size: 14px; }
+
+  /* Canvas responsive */
   canvas { border: 2px solid #333; background: #fff; display: block; margin: 0 auto 12px auto; width: 100%; height: auto; }
   #measureBtn { font-size: 20px; padding: 10px 20px; font-weight: bold; border-radius: 6px; border: none; color: #fff; }
   #deleteLastBtn, #endSurveyBtn, #saveResultsBtn, #clearDataBtn { font-size:16px; padding:8px 12px; }
@@ -43,10 +53,10 @@
   table { border-collapse: collapse; width: 100%; max-width: 880px; margin: 8px auto; font-size: 16px; }
   th, td { border:1px solid #ccc; padding: 6px 8px; text-align: right; }
   th:first-child, td:first-child { text-align: left; }
-  .summary { max-width: 880px; margin: 8px auto; font-family: monospace; }
-  .summary p { margin: 6px 0; }
+  .summary { max-width: 520px; margin: 8px auto; font-family: monospace; white-space: pre; } /* aligned style */
+  .summary h3 { margin: 8px 0; font-family: Arial, sans-serif; font-weight: bold; white-space: normal; }
+
   .row { display:flex; gap: 10px; align-items:center; margin: 8px 0; flex-wrap: wrap; }
-  .helper { text-align:center; color:#444; margin: 8px 0; }
 
   /* Metrics bars */
   .metrics-bar {
@@ -79,11 +89,33 @@
   .metrics-row { display: flex; gap: 24px; align-items: baseline; width: 100%; }
   .metrics-bar-top .value { min-width: 60px; text-align: left; }
 
+  /* Bottom metrics stacked on left with aligned columns */
+  #metricsBottom {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    max-width: 520px;
+    margin: 0 auto;
+  }
+  #metricsBottom .metric {
+    display: grid;
+    grid-template-columns: 150px 1fr;
+    align-items: baseline;
+    gap: 8px;
+  }
+  #metricsBottom .metric .label { font-weight: bold; text-align: left; }
+  #metricsBottom .metric .value {
+    font-family: monospace;
+    white-space: pre;
+    text-align: left;
+  }
+
   /* Canvas wrapper & Quality badge (left) */
   .canvas-wrap {
     position: relative;
     width: 100%;
-    max-width: 520px;  /* expand nicely on laptop while staying phone-friendly */
+    max-width: 520px;
     margin: 0 auto;
   }
   .quality-badge {
@@ -172,12 +204,13 @@
               onclick="if(window.toggleHandler){window.toggleHandler(event);} return false;">Start</button>
       <button id="deleteLastBtn" type="button">Delete Last Sample</button>
 
-      <div class="metrics-bar" aria-live="polite">
-        <div class="metric"><span class="label">Average:</span><span class="value" id="avgMetric">— m/s | — mph</span></div>
-        <div class="metric"><span class="label">P85:</span><span class="value" id="p85Metric">— m/s | — mph</span></div>
+      <!-- Bottom metrics stacked & aligned -->
+      <div class="metrics-bar" id="metricsBottom" aria-live="polite">
+        <div class="metric"><span class="label">Average Speed:</span><span class="value" id="avgMetric">— m/s | — mph</span></div>
+        <div class="metric"><span class="label">P85 Speed:</span><span class="value" id="p85Metric">— m/s | — mph</span></div>
       </div>
     </fieldset>
-    <p class="helper">When you're done, click "End Survey" to see the results.</p>
+    <p class="helper one-line">Click End Survey to see results.</p>
     <div style="text-align:center;">
       <button id="endSurveyBtn" type="button" style="background-color:red;">End Survey</button>
     </div>
@@ -185,7 +218,13 @@
 
   <!-- TAB 3: RESULTS -->
   <div id="resultsTab" class="tab-content hidden" aria-hidden="true">
-    <div class="summary" id="summaryBox"></div>
+    <div class="summary">
+<h3>Results Summary</h3>
+<span id="resultAvg">Average Speed     : — m/s | — mph</span>
+<span id="resultP85">85th Percentile   : — m/s | — mph</span>
+<span id="resultP15">15th Percentile   : — m/s | — mph</span>
+<span id="resultP05">5th Percentile    : — m/s | — mph</span>
+    </div>
     <table id="resultsTable">
       <thead><tr><th>#</th><th>Time (s)</th><th>Speed (m/s)</th><th>Speed (mph)</th></tr></thead>
       <tbody></tbody>
@@ -208,6 +247,7 @@
 })();
 function nowMs(){ return (window.performance && performance.now) ? performance.now() : Date.now(); }
 function padRight(str, len){ str = String(str); while (str.length < len) str += ' '; return str; }
+function padLeft(str, len){ str = String(str); if (str.length >= len) return str; return Array(len - str.length + 1).join(' ') + str; }
 
 /* Elements */
 var canvas = document.getElementById('canvas');
@@ -234,7 +274,13 @@ var resultsTab = document.getElementById('resultsTab');
 
 var gotoMeasureBtn = document.getElementById('gotoMeasureBtn');
 var resultsTbody = document.querySelector('#resultsTable tbody');
-var summaryBox = document.getElementById('summaryBox');
+
+/* Results summary elements */
+var resultAvg = document.getElementById('resultAvg');
+var resultP85 = document.getElementById('resultP85');
+var resultP15 = document.getElementById('resultP15');
+var resultP05 = document.getElementById('resultP05');
+
 var detailsHint = document.getElementById('detailsHint');
 var detailsErrors = document.getElementById('detailsErrors');
 
@@ -274,11 +320,11 @@ function validateFields() {
     if (!cond) { el.classList.add('invalid'); ok = false; }
     else { el.classList.remove('invalid'); }
   }
-  var siteOk = /^[A-Za-z0-9]{1,7}$/.test(siteInput.value);
-  var junctionOk = junctionInput.value.trim().length > 0;
-  var armOk = armInput.value.trim().length > 0;
-  var dateOk = !!dateInput.value;
-  var dist = parseFloat(distanceInput.value);
+  var siteOk = /^[A-Za-z0-9]{1,7}$/.test(siteInput.value || '');
+  var junctionOk = (junctionInput.value || '').trim().length > 0;
+  var armOk = (armInput.value || '').trim().length > 0;
+  var dateOk = !!(dateInput.value || '');
+  var dist = parseFloat(distanceInput.value || '');
   var distOk = !isNaN(dist) && dist > 0;
 
   mark(siteInput, siteOk);
@@ -315,7 +361,7 @@ function showTab(tab) {
     tab = 'detailsTab';
   }
   if (tab === 'resultsTab' && !resultsUnlocked) {
-    alert('Press "End Survey" to view results.');
+    alert('Press \"End Survey\" to view results.');
     tab = 'measureTab';
   }
   detailsTab.classList.add('hidden'); detailsTab.setAttribute('aria-hidden','true');
@@ -330,7 +376,7 @@ function showTab(tab) {
   } else if (tab === 'measureTab') {
     measureTab.classList.remove('hidden'); measureTab.setAttribute('aria-hidden','false');
     measureTabBtn.classList.add('active');
-    resizeCanvas(); // ensure proper sizing when the tab becomes visible
+    resizeCanvas();
   } else {
     resultsTab.classList.remove('hidden'); resultsTab.setAttribute('aria-hidden','false');
     resultsTabBtn.classList.add('active');
@@ -350,18 +396,15 @@ var BASE_W = 460, BASE_H = 210, BASE_RATIO = BASE_H / BASE_W;
 function resizeCanvas(){
   if (!canvas || !canvasWrap) return;
   var dpr = window.devicePixelRatio || 1;
-  var cssWidth = canvasWrap.clientWidth; // width in CSS pixels
+  var cssWidth = canvasWrap.clientWidth;
   var cssHeight = Math.round(cssWidth * BASE_RATIO);
 
-  // Set CSS size
   canvas.style.width = cssWidth + 'px';
   canvas.style.height = cssHeight + 'px';
 
-  // Set internal bitmap size for crisp rendering
   canvas.width = Math.round(cssWidth * dpr);
   canvas.height = Math.round(cssHeight * dpr);
 
-  // Scale drawings to CSS pixels
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
   renderDisplay();
@@ -369,12 +412,11 @@ function resizeCanvas(){
 
 /* Canvas rendering and quality badge */
 function drawLines(lines) {
-  // Use font relative to base to keep legible on small screens
   ctx.clearRect(0,0,canvas.width,canvas.height);
   ctx.font = '16px monospace';
   ctx.fillStyle = '#000';
   var hasIntro = (measurements.length === 0);
-  var y = hasIntro ? 72 : 36; // push intro down so it doesn't sit under the quality badge
+  var y = hasIntro ? 72 : 36; // move intro below the quality badge
   var x = 12;
   for (var i=0;i<lines.length;i++){ ctx.fillText(lines[i], x, y); y += 22; }
 }
@@ -385,6 +427,7 @@ function getQuality(n){
   return {label:'Poor', cls:'quality-poor'};
 }
 function updateQualityBadge(){
+  var qualityBadge = document.getElementById('qualityBadge');
   if (!qualityBadge) return;
   var q = getQuality(measurements.length);
   qualityBadge.textContent = 'Quality: ' + q.label;
@@ -409,6 +452,16 @@ function renderDisplay() {
   updateEndSurveyColor();
   updateMetricsBars();
   updateQualityBadge();
+}
+
+/* Formatting helpers for aligned metric values */
+function fmtMetric(ms){
+  if (!isFinite(ms)) return '— m/s | — mph';
+  var mps  = Number(ms).toFixed(2);
+  var mph  = Number(ms * 2.23694).toFixed(2);
+  var mpsP = padLeft(mps, 6);
+  var mphP = padLeft(mph, 6);
+  return mpsP + ' m/s | ' + mphP + ' mph';
 }
 
 /* Timing */
@@ -469,18 +522,6 @@ function percentile(sortedArray, p) {
   var weight = idx - lower;
   return sortedArray[lower] * (1 - weight) + sortedArray[upper] * weight;
 }
-function sanitizeFilePart(s) { return s.replace(/[^A-Za-z0-9_-]/g, '_'); }
-function trunc(s, n) { return s.length <= n ? s : s.slice(0, n); }
-function makeFilename() {
-  var d = dateInput.value ? new Date(dateInput.value) : new Date();
-  var yy = String(d.getFullYear()).slice(-2);
-  var mm = ('0' + (d.getMonth()+1)).slice(-2);
-  var dd = ('0' + d.getDate()).slice(-2);
-  var site = sanitizeFilePart(siteInput.value || 'SITE');
-  var armRaw = armInput.value || 'ARM';
-  var armPart = sanitizeFilePart(trunc(armRaw, 12));
-  return yy + mm + dd + '_' + site + '_' + armPart + '.txt';
-}
 function renderResultsTable() {
   while (resultsTbody.firstChild) resultsTbody.removeChild(resultsTbody.firstChild);
   for (var i=0;i<measurements.length;i++){
@@ -495,27 +536,19 @@ function renderResultsTable() {
   }
 }
 function renderSummaryBox() {
-  var html = '';
-  if (measurements.length === 0) {
-    html = '<p>No measurements recorded yet.</p>';
-  } else {
-    var sum = 0; for (var j=0;j<measurements.length;j++){ sum += measurements[j].speed; }
-    var avg = sum / measurements.length;
-    var speeds = []; for (var k=0;k<measurements.length;k++){ speeds.push(measurements[k].speed); }
-    speeds.sort(function(a,b){ return a-b; });
-    var p5 = percentile(speeds, 5);
-    var p15 = percentile(speeds, 15);
-    var p85 = percentile(speeds, 85);
-    html += '<p><strong>Samples:</strong> ' + measurements.length + ' &nbsp; <strong>Distance:</strong> ' + (parseFloat(distanceInput.value)||0) + ' m</p>';
-    html += '<p><strong>Average:</strong> ' + avg.toFixed(2) + ' m/s (' + (avg*2.23694).toFixed(2) + ' mph)</p>';
-    html += '<p><strong>85th Percentile:</strong> ' + p85.toFixed(2) + ' m/s (' + (p85*2.23694).toFixed(2) + ' mph)</p>';
-    html += '<p><strong>15th Percentile:</strong> ' + p15.toFixed(2) + ' m/s (' + (p15*2.23694).toFixed(2) + ' mph)</p>';
-    html += '<p><strong>5th Percentile:</strong> ' + p5.toFixed(2) + ' m/s (' + (p5*2.23694).toFixed(2) + ' mph)</p>';
-  }
-  summaryBox.innerHTML = html;
+  var speeds = measurements.map(function(x){ return x.speed; }).sort(function(a,b){ return a - b; });
+  function pct(sorted, p){ if (!sorted.length) return NaN; var idx=(p/100)*(sorted.length-1), lo=Math.floor(idx), hi=Math.ceil(idx); if (hi>=sorted.length) return sorted[lo]; var w=idx-lo; return sorted[lo]*(1-w)+sorted[hi]*w; }
+  var avg = NaN; if (speeds.length){ avg = speeds.reduce(function(a,b){return a+b;},0)/speeds.length; }
+  var p85 = pct(speeds, 85);
+  var p15 = pct(speeds, 15);
+  var p05 = pct(speeds, 5);
+  document.getElementById('resultAvg').textContent = 'Average Speed     : ' + fmtMetric(avg);
+  document.getElementById('resultP85').textContent = '85th Percentile   : ' + fmtMetric(p85);
+  document.getElementById('resultP15').textContent = '15th Percentile   : ' + fmtMetric(p15);
+  document.getElementById('resultP05').textContent = '5th Percentile    : ' + fmtMetric(p05);
 }
 
-/* TXT export */
+/* TXT export (aligned) */
 function buildTxtContent() {
   function pad(str, len, alignRight) {
     str = String(str);
@@ -548,22 +581,42 @@ function buildTxtContent() {
   if (measurements.length === 0) lines.push('(no measurements)');
   lines.push('');
   var speeds = measurements.map(function(x){ return x.speed; }).sort(function(a,b){ return a - b; });
-  function percentile(sorted, p) { if (!sorted.length) return 0; var idx=(p/100)*(sorted.length-1), lo=Math.floor(idx), hi=Math.ceil(idx); if (hi>=sorted.length) return sorted[lo]; var w=idx-lo; return sorted[lo]*(1-w)+sorted[hi]*w; }
-  var avg = 0; if (speeds.length) { for (var j=0;j<speeds.length;j++) avg += speeds[j]; avg /= speeds.length; }
+  function percentile(sorted, p) { if (!sorted.length) return NaN; var idx=(p/100)*(sorted.length-1), lo=Math.floor(idx), hi=Math.ceil(idx); if (hi>=sorted.length) return sorted[lo]; var w=idx-lo; return sorted[lo]*(1-w)+sorted[hi]*w; }
+  var avg = NaN; if (speeds.length) { avg = speeds.reduce(function(a,b){return a+b;},0)/speeds.length; }
   var p85 = percentile(speeds, 85);
   var p15 = percentile(speeds, 15);
   var p5  = percentile(speeds, 5);
-  var W_LABEL = 18, W_VAL = 8;
+
+  // Aligned two-column style for results
   function metricRow(label, ms){
-    var mph = ms * 2.23694;
-    return pad(label, W_LABEL, false) + ' : ' + numf(ms, W_VAL) + ' m/s | ' + numf(mph, W_VAL) + ' mph';
+    var val = isFinite(ms) ? (function(){
+      var mps = Number(ms).toFixed(2);
+      var mph = Number(ms * 2.23694).toFixed(2);
+      var mpsP = padLeft(mps, 6);
+      var mphP = padLeft(mph, 6);
+      return mpsP + ' m/s | ' + mphP + ' mph';
+    })() : '   — m/s |    — mph';
+    return pad(label, 18, false) + ' : ' + val;
   }
   lines.push('RESULTS');
   lines.push(metricRow('Average Speed',   avg));
   lines.push(metricRow('85th Percentile', p85));
   lines.push(metricRow('15th Percentile', p15));
   lines.push(metricRow('5th Percentile',  p5));
-  return lines.join('\n');
+
+  return lines.join('\\n');
+}
+function sanitizeFilePart(s) { return String(s || '').replace(/[^A-Za-z0-9_-]/g, '_'); }
+function trunc(s, n) { return String(s || '').length <= n ? String(s || '') : String(s || '').slice(0, n); }
+function makeFilename() {
+  var d = dateInput.value ? new Date(dateInput.value) : new Date();
+  var yy = String(d.getFullYear()).slice(-2);
+  var mm = ('0' + (d.getMonth()+1)).slice(-2);
+  var dd = ('0' + d.getDate()).slice(-2);
+  var site = sanitizeFilePart(siteInput.value || 'SITE');
+  var armRaw = armInput.value || 'ARM';
+  var armPart = sanitizeFilePart(trunc(armRaw, 12));
+  return yy + mm + dd + '_' + site + '_' + armPart + '.txt';
 }
 function downloadText(filename, content) {
   try {
@@ -600,7 +653,20 @@ function updateEndSurveyColor() {
 }
 
 /* Metrics bars updater */
+function percentile(sortedArray, p) {
+  if (sortedArray.length === 0) return 0;
+  var idx = (p / 100) * (sortedArray.length - 1);
+  var lower = Math.floor(idx);
+  var upper = Math.ceil(idx);
+  if (upper >= sortedArray.length) return sortedArray[lower];
+  var weight = idx - lower;
+  return sortedArray[lower] * (1 - weight) + sortedArray[upper] * weight;
+}
 function updateMetricsBars(){
+  var avgMetric = document.getElementById('avgMetric');
+  var p85Metric = document.getElementById('p85Metric');
+  var countMetric = document.getElementById('countMetric');
+  var timerMetric = document.getElementById('timerMetric');
   if (countMetric) countMetric.textContent = String(measurements.length);
   if (timerMetric) {
     if (measuring) {
@@ -621,8 +687,8 @@ function updateMetricsBars(){
   var avg = sum / measurements.length;
   speeds.sort(function(a,b){ return a-b; });
   var p85 = percentile(speeds, 85);
-  avgMetric.textContent = avg.toFixed(2) + ' m/s | ' + (avg*2.23694).toFixed(2) + ' mph';
-  p85Metric.textContent = p85.toFixed(2) + ' m/s | ' + (p85*2.23694).toFixed(2) + ' mph';
+  avgMetric.textContent = fmtMetric(avg);
+  p85Metric.textContent = fmtMetric(p85);
 }
 
 /* Toggle handler */
@@ -634,8 +700,8 @@ window.toggleHandler = function(e) {
     return;
   }
   var t = nowMs();
-  if (t - lastToggleTime < 350) return;
-  lastToggleTime = t;
+  if (t - (window._lastToggleTime || 0) < 350) return;
+  window._lastToggleTime = t;
   if (!measuring) startMeasurement(); else finishMeasurement();
 };
 
@@ -651,7 +717,10 @@ function clearAllAndReset() {
   resultsUnlocked = false;
   renderDisplay();
   renderResultsTable();
-  summaryBox.innerHTML = '';
+  document.getElementById('resultAvg').textContent = 'Average Speed     : — m/s | — mph';
+  document.getElementById('resultP85').textContent = '85th Percentile   : — m/s | — mph';
+  document.getElementById('resultP15').textContent = '15th Percentile   : — m/s | — mph';
+  document.getElementById('resultP05').textContent = '5th Percentile    : — m/s | — mph';
   updateEndSurveyColor();
   updateMetricsBars();
   updateTabVisibility();
@@ -661,7 +730,7 @@ function clearAllAndReset() {
 /* Wire events */
 deleteLastBtn.addEventListener('click', deleteLastSample, false);
 document.getElementById('saveResultsBtn').addEventListener('click', function(){
-  if (!resultsUnlocked) { alert('Press "End Survey" first.'); return; }
+  if (!resultsUnlocked) { alert('Press \"End Survey\" first.'); return; }
   if (measurements.length === 0) { alert('No measurements to save.'); return; }
   downloadText(makeFilename(), buildTxtContent());
 }, false);
@@ -675,7 +744,8 @@ document.getElementById('clearDataBtn').addEventListener('click', function(){
 var liveInputs = [siteInput, junctionInput, armInput, dateInput, distanceInput];
 for (var ii=0; ii<liveInputs.length; ii++){
   liveInputs[ii].addEventListener('input', function(){
-    var cleaned = sanitizeSite(siteInput.value);
+    var value = siteInput.value || '';
+    var cleaned = value.replace(/[^A-Za-z0-9]/g, '').slice(0,7);
     if (cleaned !== siteInput.value) siteInput.value = cleaned;
     resultsUnlocked = false;
     renderDisplay();
@@ -692,6 +762,14 @@ for (var ii=0; ii<liveInputs.length; ii++){
 
 /* Init */
 function onReady(){
+  // default date if empty
+  if (!dateInput.value) {
+    var d = new Date();
+    var yyyy = d.getFullYear();
+    var mm = ('0' + (d.getMonth()+1)).slice(-2);
+    var dd = ('0' + d.getDate()).slice(-2);
+    dateInput.value = yyyy + '-' + mm + '-' + dd;
+  }
   resizeCanvas();
   renderDisplay();
   updateTabVisibility();
