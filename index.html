@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MOVA SPEED SURVEY — 3 Tabs (Gated)</title>
+<title>MOVA SPEED SURVEY — 3 Tabs (Results gated by End Survey + Quality badge)</title>
 <style>
   body { font-family: Arial, sans-serif; margin: 20px; }
   h2 { text-align:center; margin-top: 0; }
@@ -14,9 +14,7 @@
     padding: 10px 16px; border: 1px solid #999; background:#f5f5f5; cursor:pointer;
     border-radius:6px 6px 0 0; font-weight:bold;
   }
-  .tab-btn[disabled] {
-    opacity: 0.5; cursor: not-allowed;
-  }
+  .tab-btn[disabled] { opacity: 0.5; cursor: not-allowed; }
   .tab-btn.active { background:#fff; border-bottom-color: #fff; }
   .tab-content {
     border:1px solid #999; border-radius:0 6px 6px 6px; padding: 12px; max-width: 920px; margin: 0 auto;
@@ -24,11 +22,14 @@
   }
   .hidden { display:none; }
 
-  /* Original control styles */
+  /* Controls */
   fieldset { border:1px solid #999; padding: 10px 12px; margin-bottom:10px; max-width:460px; margin-left:auto; margin-right:auto; text-align:left; }
   legend { font-weight:bold; }
   label { display:inline-block; min-width: 170px; }
   input, button { margin: 6px; padding: 8px 14px; font-size: 18px; }
+  input.invalid { border:2px solid #e00; background:#fff8f8; }
+  .error-msg { color:#b00020; font-size:14px; margin:6px 0 0 0; display:none; }
+  .error-msg.show { display:block; }
   canvas { border: 2px solid #333; background: #fff; display: block; margin: 0 auto 12px auto; max-width:100%; height:auto; }
   #measureBtn { font-size: 20px; padding: 10px 20px; font-weight: bold; border-radius: 6px; border: none; color: #fff; }
   #deleteLastBtn, #endSurveyBtn, #saveResultsBtn, #clearDataBtn { font-size:16px; padding:8px 12px; }
@@ -45,15 +46,68 @@
   .summary p { margin: 6px 0; }
   .row { display:flex; gap: 10px; align-items:center; margin: 8px 0; flex-wrap: wrap; }
   .helper { text-align:center; color:#444; margin: 8px 0; }
+
+  /* Metrics bars */
+  .metrics-bar {
+    max-width: 460px;
+    margin: 8px auto 0;
+    padding: 8px 10px;
+    border-top: 1px solid #ccc;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: baseline;
+    font-family: monospace;
+  }
+  .metric { display:flex; gap: 6px; white-space: nowrap; }
+  .metric .label { font-weight:bold; }
+  .metric .value { min-width: 150px; text-align: right; }
+
+  .metrics-bar-top {
+    max-width: 460px;
+    margin: 4px auto 8px;
+    padding: 8px 10px;
+    border-bottom: 1px solid #ccc;
+    display: flex;
+    justify-content: space-between;
+    gap: 24px;
+    align-items: baseline;
+    font-family: monospace;
+  }
+  .metrics-bar-top .value { min-width: 60px; text-align: right; }
+
+  /* Canvas wrapper and quality badge */
+  .canvas-wrap {
+    position: relative;
+    display: inline-block;
+  }
+  .quality-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-family: monospace;
+    font-size: 14px;
+    border: 1px solid rgba(0,0,0,0.15);
+    background: #eee;
+    color: #222;
+    pointer-events: none;
+    user-select: none;
+  }
+  .quality-poor  { background:#ffe5e5; color:#8a0000; }
+  .quality-low   { background:#fff3cd; color:#7a5a00; }
+  .quality-fair  { background:#e3f2fd; color:#0b5394; }
+  .quality-good  { background:#e6ffed; color:#0b6b2a; }
 </style>
 </head>
 <body>
   <h2>MOVA SPEED SURVEY</h2>
 
   <div class="tabs">
-    <button class="tab-btn active" data-tab="detailsTab" id="detailsTabBtn">1. Junction Details</button>
-    <button class="tab-btn" data-tab="measureTab" id="measureTabBtn" disabled aria-disabled="true" title="Complete Junction Details first">2. Measurements</button>
-    <button class="tab-btn" data-tab="resultsTab" id="resultsTabBtn" disabled aria-disabled="true" title="Record at least one measurement first">3. Results</button>
+    <button class="tab-btn active" data-tab="detailsTab" id="detailsTabBtn" type="button">1. Junction Details</button>
+    <button class="tab-btn" data-tab="measureTab" id="measureTabBtn" type="button" disabled aria-disabled="true" title="Complete Junction Details first">2. Measurements</button>
+    <button class="tab-btn" data-tab="resultsTab" id="resultsTabBtn" type="button" disabled aria-disabled="true" title="Press End Survey to view results">3. Results</button>
   </div>
 
   <!-- TAB 1: DETAILS -->
@@ -80,6 +134,7 @@
         <label for="distance">Distance (m):</label>
         <input type="number" id="distance" placeholder="e.g. 100" min="0" step="0.1">
       </div>
+      <p id="detailsErrors" class="error-msg">Please check the highlighted fields.</p>
     </fieldset>
     <p class="helper" id="detailsHint">Fill all fields to unlock Measurements.</p>
     <div style="text-align:center;">
@@ -91,10 +146,25 @@
   <div id="measureTab" class="tab-content hidden" aria-hidden="true">
     <fieldset>
       <legend>Measurement</legend>
-      <canvas id="canvas" width="460" height="300"></canvas>
+
+      <div class="metrics-bar-top" aria-live="polite">
+        <div class="metric"><span class="label">Samples:</span><span class="value" id="countMetric">0</span></div>
+        <div class="metric"><span class="label">Timer:</span><span class="value" id="timerMetric">0.00 s</span></div>
+      </div>
+
+      <div class="canvas-wrap">
+        <canvas id="canvas" width="460" height="300"></canvas>
+        <span id="qualityBadge" class="quality-badge">Quality: —</span>
+      </div>
+
       <button id="measureBtn" type="button" class="btn-disabled" style="background-color:#999;" title="Start or stop timing"
               onclick="if(window.toggleHandler){window.toggleHandler(event);} return false;">Start</button>
       <button id="deleteLastBtn" type="button">Delete Last Sample</button>
+
+      <div class="metrics-bar" aria-live="polite">
+        <div class="metric"><span class="label">Average:</span><span class="value" id="avgMetric">— m/s | — mph</span></div>
+        <div class="metric"><span class="label">P85:</span><span class="value" id="p85Metric">— m/s | — mph</span></div>
+      </div>
     </fieldset>
     <p class="helper">When you're done, click "End Survey" to see the results.</p>
     <div style="text-align:center;">
@@ -116,7 +186,7 @@
   </div>
 
 <script>
-/* ------- Polyfills ------- */
+/* Polyfills */
 (function(){
   if (!window.requestAnimationFrame) {
     window.requestAnimationFrame = function(cb){ return setTimeout(function(){ cb(Date.now()); }, 16); };
@@ -129,7 +199,7 @@
 function nowMs(){ return (window.performance && performance.now) ? performance.now() : Date.now(); }
 function padRight(str, len){ str = String(str); while (str.length < len) str += ' '; return str; }
 
-/* ------- Elements ------- */
+/* Elements */
 var canvas = document.getElementById('canvas');
 var ctx = canvas.getContext('2d');
 
@@ -155,75 +225,104 @@ var gotoMeasureBtn = document.getElementById('gotoMeasureBtn');
 var resultsTbody = document.querySelector('#resultsTable tbody');
 var summaryBox = document.getElementById('summaryBox');
 var detailsHint = document.getElementById('detailsHint');
+var detailsErrors = document.getElementById('detailsErrors');
 
-/* ------- State ------- */
+var avgMetric = document.getElementById('avgMetric');
+var p85Metric = document.getElementById('p85Metric');
+var countMetric = document.getElementById('countMetric');
+var timerMetric = document.getElementById('timerMetric');
+var qualityBadge = document.getElementById('qualityBadge');
+
+/* State */
 var measuring = false;
 var startTime = 0;
 var rafId = null;
 var lastToggleTime = 0;
 var measurements = []; // {distance, time, speed, mph}
+var resultsUnlocked = false;
 
-/* ------- Gating logic ------- */
-function formIsValid() {
-  var site = siteInput.value;
-  var junction = junctionInput.value.replace(/^\s+|\s+$/g,'');
-  var arm = armInput.value.replace(/^\s+|\s+$/g,'');
-  var date = dateInput.value;
-  var dist = parseFloat(distanceInput.value);
-  var siteOk = /^[A-Za-z0-9]{1,7}$/.test(site);
-  var junctionOk = junction.length > 0;
-  var armOk = arm.length > 0;
-  var dateOk = !!date;
-  var distOk = !isNaN(dist) && dist > 0;
-  return siteOk && junctionOk && armOk && dateOk && distOk;
+/* Utility */
+function setDisabled(el, disabled){
+  if (!el) return;
+  el.disabled = !!disabled;
+  if (disabled) { el.setAttribute('disabled',''); }
+  else { el.removeAttribute('disabled'); }
+  el.setAttribute('aria-disabled', String(!!disabled));
+}
+function addRobustTap(el, handler){
+  if (!el) return;
+  el.addEventListener('click', handler, false);
+  el.addEventListener('pointerup', handler, false);
+  el.addEventListener('touchend', handler, false);
 }
 
+/* Validation + highlighting */
+function validateFields() {
+  var ok = true;
+  function mark(el, cond) {
+    if (!cond) { el.classList.add('invalid'); ok = false; }
+    else { el.classList.remove('invalid'); }
+  }
+  var siteOk = /^[A-Za-z0-9]{1,7}$/.test(siteInput.value);
+  var junctionOk = junctionInput.value.trim().length > 0;
+  var armOk = armInput.value.trim().length > 0;
+  var dateOk = !!dateInput.value;
+  var dist = parseFloat(distanceInput.value);
+  var distOk = !isNaN(dist) && dist > 0;
+
+  mark(siteInput, siteOk);
+  mark(junctionInput, junctionOk);
+  mark(armInput, armOk);
+  mark(dateInput, dateOk);
+  mark(distanceInput, distOk);
+
+  detailsErrors.classList.toggle('show', !ok);
+  return ok;
+}
+function formIsValid() { return validateFields(); }
+
+/* Gating */
 function updateTabVisibility() {
   var detailsOK = formIsValid();
-  var hasData = measurements.length > 0;
 
-  // Measurements tab gating
-  measureTabBtn.disabled = !detailsOK;
-  measureTabBtn.setAttribute('aria-disabled', String(!detailsOK));
-  gotoMeasureBtn.disabled = !detailsOK;
-  gotoMeasureBtn.setAttribute('aria-disabled', String(!detailsOK));
+  setDisabled(measureTabBtn, !detailsOK);
+  setDisabled(gotoMeasureBtn, !detailsOK);
   detailsHint.textContent = detailsOK ? 'Details complete. Proceed to Measurements.' : 'Fill all fields to unlock Measurements.';
 
-  // Results tab gating
-  resultsTabBtn.disabled = !hasData;
-  resultsTabBtn.setAttribute('aria-disabled', String(!hasData));
+  setDisabled(resultsTabBtn, !resultsUnlocked);
 
-  // If current tab is not allowed anymore
   if (!detailsOK && (measureTabBtn.classList.contains('active') || resultsTabBtn.classList.contains('active'))) {
     showTab('detailsTab');
   }
-  if (!hasData && resultsTabBtn.classList.contains('active')) {
+  if (!resultsUnlocked && resultsTabBtn.classList.contains('active')) {
     showTab('measureTab');
   }
-
-  // Reflect measure button
   applyMeasureBtnEnabled(detailsOK);
 }
 
+/* Tabs */
 function showTab(tab) {
-  // Hide all
+  if (tab === 'measureTab' && !formIsValid()) {
+    alert('Please complete Junction Details first.');
+    tab = 'detailsTab';
+  }
+  if (tab === 'resultsTab' && !resultsUnlocked) {
+    alert('Press "End Survey" to view results.');
+    tab = 'measureTab';
+  }
   detailsTab.classList.add('hidden'); detailsTab.setAttribute('aria-hidden','true');
   measureTab.classList.add('hidden');  measureTab.setAttribute('aria-hidden','true');
   resultsTab.classList.add('hidden');  resultsTab.setAttribute('aria-hidden','true');
   detailsTabBtn.classList.remove('active');
   measureTabBtn.classList.remove('active');
   resultsTabBtn.classList.remove('active');
-
-  // Show selected
   if (tab === 'detailsTab') {
     detailsTab.classList.remove('hidden'); detailsTab.setAttribute('aria-hidden','false');
     detailsTabBtn.classList.add('active');
   } else if (tab === 'measureTab') {
-    if (measureTabBtn.disabled) return; // gated
     measureTab.classList.remove('hidden'); measureTab.setAttribute('aria-hidden','false');
     measureTabBtn.classList.add('active');
-  } else { // resultsTab
-    if (resultsTabBtn.disabled) return; // gated
+  } else {
     resultsTab.classList.remove('hidden'); resultsTab.setAttribute('aria-hidden','false');
     resultsTabBtn.classList.add('active');
     renderResultsTable();
@@ -231,13 +330,13 @@ function showTab(tab) {
   }
 }
 
-/* ------- Events for tabs ------- */
-detailsTabBtn.addEventListener('click', function(){ showTab('detailsTab'); });
-measureTabBtn.addEventListener('click', function(){ showTab('measureTab'); });
-resultsTabBtn.addEventListener('click', function(){ showTab('resultsTab'); });
-gotoMeasureBtn.addEventListener('click', function(){ showTab('measureTab'); });
+/* Robust taps */
+addRobustTap(detailsTabBtn, function(){ showTab('detailsTab'); });
+addRobustTap(measureTabBtn, function(){ updateTabVisibility(); showTab('measureTab'); });
+addRobustTap(resultsTabBtn, function(){ updateTabVisibility(); showTab('resultsTab'); });
+addRobustTap(gotoMeasureBtn, function(){ updateTabVisibility(); showTab('measureTab'); });
 
-/* ------- Helpers ------- */
+/* Helpers */
 function setDefaultDateIfEmpty() {
   try {
     if (!dateInput.value) {
@@ -251,7 +350,7 @@ function setDefaultDateIfEmpty() {
 }
 function sanitizeSite(value) { return value.replace(/[^A-Za-z0-9]/g, '').slice(0,7); }
 
-/* ------- Canvas ------- */
+/* Canvas rendering and quality badge */
 function drawLines(lines) {
   ctx.clearRect(0,0,canvas.width,canvas.height);
   ctx.font = '16px monospace';
@@ -259,19 +358,24 @@ function drawLines(lines) {
   var y = 36, x = 12;
   for (var i=0;i<lines.length;i++){ ctx.fillText(lines[i], x, y); y += 22; }
 }
+function getQuality(n){
+  if (n > 100) return {label:'Good', cls:'quality-good'};
+  if (n >= 50)  return {label:'Fair', cls:'quality-fair'};
+  if (n >= 25)  return {label:'Low',  cls:'quality-low'};
+  return {label:'Poor', cls:'quality-poor'};
+}
+function updateQualityBadge(){
+  if (!qualityBadge) return;
+  var q = getQuality(measurements.length);
+  qualityBadge.textContent = 'Quality: ' + q.label;
+  qualityBadge.className = 'quality-badge ' + q.cls;
+}
 function renderDisplay() {
   var lines = [];
   var valid = formIsValid();
-
-  if (measuring) {
-    var elapsed = ((nowMs() - startTime) / 1000).toFixed(2);
-    lines.push('Timing... ' + elapsed + 's');
-  } else if (measurements.length === 0) {
+  if (measurements.length === 0) {
     lines.push(valid ? 'Press Start to begin measuring' : 'Complete details: Site, Location, Arm, Date, Distance (>0)');
-  } else {
-    lines.push('Total Samples: ' + measurements.length);
   }
-
   lines.push('');
   lines.push('#   Time(s)  m/s    mph');
   var lastSamples = measurements.slice(-5);
@@ -281,23 +385,13 @@ function renderDisplay() {
     var row = padRight(String(num),4) + padRight(m.time.toFixed(2),9) + padRight(m.speed.toFixed(2),7) + m.mph.toFixed(2);
     lines.push(row);
   }
-
-  if (measurements.length > 0) {
-    var sum = 0; for (var j=0;j<measurements.length;j++){ sum += measurements[j].speed; }
-    var avg = sum / measurements.length;
-    var speeds = []; for (var k=0;k<measurements.length;k++){ speeds.push(measurements[k].speed); }
-    speeds.sort(function(a,b){ return a-b; });
-    var p85 = percentile(speeds, 85);
-    lines.push('');
-    lines.push('Average: ' + avg.toFixed(2) + ' m/s (' + (avg*2.23694).toFixed(2) + ' mph)');
-    lines.push('P85: ' + p85.toFixed(2) + ' m/s (' + (p85*2.23694).toFixed(2) + ' mph)');
-  }
-
   drawLines(lines);
   updateEndSurveyColor();
+  updateMetricsBars();
+  updateQualityBadge();
 }
 
-/* ------- Timing ------- */
+/* Timing */
 function tick() {
   renderDisplay();
   rafId = requestAnimationFrame(tick);
@@ -309,31 +403,43 @@ function startMeasurement() {
   measureBtn.style.backgroundColor = 'red';
   startTime = nowMs();
   rafId = requestAnimationFrame(tick);
+  resultsUnlocked = false;
+  updateTabVisibility();
 }
 function finishMeasurement() {
   if (!measuring) return;
   measuring = false;
   measureBtn.textContent = 'Start';
-  measureBtn.style.backgroundColor = '#4CAF50'; // green
+  measureBtn.style.backgroundColor = '#4CAF50';
   if (rafId) cancelAnimationFrame(rafId);
-
   var elapsed = (nowMs() - startTime) / 1000;
   var distance = parseFloat(distanceInput.value) || 0;
   var speed = (elapsed > 0) ? (distance / elapsed) : 0;
   var mph = speed * 2.23694;
-
   measurements.push({ distance: distance, time: elapsed, speed: speed, mph: mph });
   renderDisplay();
-  updateTabVisibility(); // results now relevant
+  resultsUnlocked = false;
+  updateTabVisibility();
 }
 function deleteLastSample() {
   if (measurements.length === 0) { alert('No sample to delete!'); return; }
   measurements.pop();
   renderDisplay();
+  resultsUnlocked = false;
   updateTabVisibility();
 }
 
-/* ------- Results ------- */
+/* End survey => unlock results */
+addRobustTap(endSurveyBtn, function(){
+  if (measurements.length === 0) { alert('No measurements recorded!'); return; }
+  resultsUnlocked = true;
+  updateTabVisibility();
+  showTab('resultsTab');
+  renderResultsTable();
+  renderSummaryBox();
+});
+
+/* Results building */
 function percentile(sortedArray, p) {
   if (sortedArray.length === 0) return 0;
   var idx = (p / 100) * (sortedArray.length - 1);
@@ -380,7 +486,6 @@ function renderSummaryBox() {
     var p5 = percentile(speeds, 5);
     var p15 = percentile(speeds, 15);
     var p85 = percentile(speeds, 85);
-
     html += '<p><strong>Samples:</strong> ' + measurements.length + ' &nbsp; <strong>Distance:</strong> ' + (parseFloat(distanceInput.value)||0) + ' m</p>';
     html += '<p><strong>Average:</strong> ' + avg.toFixed(2) + ' m/s (' + (avg*2.23694).toFixed(2) + ' mph)</p>';
     html += '<p><strong>85th Percentile:</strong> ' + p85.toFixed(2) + ' m/s (' + (p85*2.23694).toFixed(2) + ' mph)</p>';
@@ -390,7 +495,7 @@ function renderSummaryBox() {
   summaryBox.innerHTML = html;
 }
 
-/* ------- Human-readable TXT export ------- */
+/* TXT export */
 function buildTxtContent() {
   function pad(str, len, alignRight) {
     str = String(str);
@@ -398,10 +503,9 @@ function buildTxtContent() {
     var spaces = Array(len - str.length + 1).join(' ');
     return alignRight ? spaces + str : str + spaces;
   }
-  function num(n, len) { return pad((isFinite(n) ? Number(n).toFixed(2) : '0.00'), len, true); }
-  function lineMetric(label, ms) { var mph = ms * 2.23694; return label + ' : ' + ms.toFixed(2) + ' m/s | ' + mph.toFixed(2) + ' mph'; }
+  function numf(n, len) { return pad((isFinite(n) ? Number(n).toFixed(2) : '0.00'), len, true); }
+  function numi(n, len) { return pad(parseInt(n, 10), len, true); }
 
-  // 1) Junction details
   var lines = [];
   var distance = parseFloat(distanceInput.value) || 0;
   lines.push('JUNCTION DETAILS');
@@ -411,35 +515,34 @@ function buildTxtContent() {
   lines.push('Date               : ' + (dateInput.value || new Date().toISOString().split('T')[0]));
   lines.push('Distance of Travel : ' + distance + ' m');
   lines.push('');
-
-  // 2) Measurements table
   lines.push('MEASUREMENTS');
-  var W_IDX = 4, W_TIME = 10, W_MS = 12, W_MPH = 12;
-  var header = pad('#', W_IDX, true) + ' ' + pad('Time (s)', W_TIME, false) + ' ' + pad('Speed (m/s)', W_MS, false) + ' ' + pad('Speed (mph)', W_MPH, false);
+  var W_IDX = 5, W_TIME = 10, W_MS = 12, W_MPH = 12;
+  var header = pad('#', W_IDX, true) + ' ' + pad('Time (s)', W_TIME, true) + ' ' + pad('Speed (m/s)', W_MS, true) + ' ' + pad('Speed (mph)', W_MPH, true);
   lines.push(header);
   lines.push(Array(header.length + 1).join('-'));
   for (var i = 0; i < measurements.length; i++) {
     var m = measurements[i];
-    var row = num(i + 1, W_IDX) + ' ' + num(m.time, W_TIME) + ' ' + num(m.speed, W_MS) + ' ' + num(m.mph, W_MPH);
+    var row = numi(i + 1, W_IDX) + ' ' + numf(m.time, W_TIME) + ' ' + numf(m.speed, W_MS) + ' ' + numf(m.mph, W_MPH);
     lines.push(row);
   }
   if (measurements.length === 0) lines.push('(no measurements)');
   lines.push('');
-
-  // 3) Results
   var speeds = measurements.map(function(x){ return x.speed; }).sort(function(a,b){ return a - b; });
   function percentile(sorted, p) { if (!sorted.length) return 0; var idx=(p/100)*(sorted.length-1), lo=Math.floor(idx), hi=Math.ceil(idx); if (hi>=sorted.length) return sorted[lo]; var w=idx-lo; return sorted[lo]*(1-w)+sorted[hi]*w; }
   var avg = 0; if (speeds.length) { for (var j=0;j<speeds.length;j++) avg += speeds[j]; avg /= speeds.length; }
   var p85 = percentile(speeds, 85);
   var p15 = percentile(speeds, 15);
   var p5  = percentile(speeds, 5);
-
+  var W_LABEL = 18, W_VAL = 8;
+  function metricRow(label, ms){
+    var mph = ms * 2.23694;
+    return pad(label, W_LABEL, false) + ' : ' + numf(ms, W_VAL) + ' m/s | ' + numf(mph, W_VAL) + ' mph';
+  }
   lines.push('RESULTS');
-  lines.push(lineMetric('Average Speed', avg));
-  lines.push(lineMetric('85th Percentile', p85));
-  lines.push(lineMetric('15th Percentile', p15));
-  lines.push(lineMetric('5th Percentile',  p5));
-
+  lines.push(metricRow('Average Speed',   avg));
+  lines.push(metricRow('85th Percentile', p85));
+  lines.push(metricRow('15th Percentile', p15));
+  lines.push(metricRow('5th Percentile',  p5));
   return lines.join('\n');
 }
 function downloadText(filename, content) {
@@ -459,28 +562,50 @@ function downloadText(filename, content) {
   }
 }
 
-/* ------- UI helpers ------- */
+/* UI helpers */
 function applyMeasureBtnEnabled(enabled) {
   if (enabled && !measuring) {
     measureBtn.classList.remove('btn-disabled');
-    measureBtn.style.backgroundColor = '#4CAF50'; // green
+    measureBtn.style.backgroundColor = '#4CAF50';
   } else if (!enabled && !measuring) {
     measureBtn.classList.add('btn-disabled');
-    measureBtn.style.backgroundColor = '#999'; // grey
+    measureBtn.style.backgroundColor = '#999';
   }
 }
 function updateEndSurveyColor() {
   var n = measurements.length;
-  if (n < 25) {
-    endSurveyBtn.style.backgroundColor = 'red';
-  } else if (n < 50) {
-    endSurveyBtn.style.backgroundColor = 'orange';
-  } else {
-    endSurveyBtn.style.backgroundColor = 'green';
-  }
+  if (n < 25) { endSurveyBtn.style.backgroundColor = 'red'; }
+  else if (n < 50) { endSurveyBtn.style.backgroundColor = 'orange'; }
+  else { endSurveyBtn.style.backgroundColor = 'green'; }
 }
 
-/* ------- Global toggle handler ------- */
+/* Metrics bars updater */
+function updateMetricsBars(){
+  if (countMetric) countMetric.textContent = String(measurements.length);
+  if (timerMetric) {
+    if (measuring) {
+      var elapsed = (nowMs() - startTime) / 1000;
+      timerMetric.textContent = elapsed.toFixed(2) + ' s';
+    } else {
+      timerMetric.textContent = '0.00 s';
+    }
+  }
+  if (!avgMetric || !p85Metric) return;
+  if (measurements.length === 0){
+    avgMetric.textContent = '— m/s | — mph';
+    p85Metric.textContent = '— m/s | — mph';
+    return;
+  }
+  var sum = 0, speeds = [];
+  for (var i=0;i<measurements.length;i++){ sum += measurements[i].speed; speeds.push(measurements[i].speed); }
+  var avg = sum / measurements.length;
+  speeds.sort(function(a,b){ return a-b; });
+  var p85 = percentile(speeds, 85);
+  avgMetric.textContent = avg.toFixed(2) + ' m/s | ' + (avg*2.23694).toFixed(2) + ' mph';
+  p85Metric.textContent = p85.toFixed(2) + ' m/s | ' + (p85*2.23694).toFixed(2) + ' mph';
+}
+
+/* Toggle handler */
 window.toggleHandler = function(e) {
   if (e && e.preventDefault) e.preventDefault();
   if (!formIsValid()) {
@@ -489,74 +614,69 @@ window.toggleHandler = function(e) {
     return;
   }
   var t = nowMs();
-  if (t - lastToggleTime < 350) return; // debounce
+  if (t - lastToggleTime < 350) return;
   lastToggleTime = t;
   if (!measuring) startMeasurement(); else finishMeasurement();
 };
 
-/* ------- Wire events ------- */
+/* Clear & Reset */
+function clearAllAndReset() {
+  if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+  measuring = false;
+  measureBtn.textContent = 'Start';
+  measureBtn.style.backgroundColor = '#4CAF50';
+  measurements.length = 0;
+  armInput.value = '';
+  distanceInput.value = '';
+  resultsUnlocked = false;
+  renderDisplay();
+  renderResultsTable();
+  summaryBox.innerHTML = '';
+  updateEndSurveyColor();
+  updateMetricsBars();
+  updateTabVisibility();
+  showTab('detailsTab');
+}
+
+/* Wire events */
 deleteLastBtn.addEventListener('click', deleteLastSample, false);
-endSurveyBtn.addEventListener('click', function(){
-  if (measurements.length === 0) { alert('No measurements recorded!'); return; }
-  showTab('resultsTab');
-  renderResultsTable(); renderSummaryBox();
-}, false);
 document.getElementById('saveResultsBtn').addEventListener('click', function(){
+  if (!resultsUnlocked) { alert('Press "End Survey" first.'); return; }
   if (measurements.length === 0) { alert('No measurements to save.'); return; }
   downloadText(makeFilename(), buildTxtContent());
 }, false);
 document.getElementById('clearDataBtn').addEventListener('click', function(){
-  if (confirm('Clear all measurements?')) {
-    measurements = [];
-    renderDisplay();
-    renderResultsTable(); renderSummaryBox();
-    updateTabVisibility();
+  if (confirm('Clear all measurements and reset?')) {
+    clearAllAndReset();
   }
 }, false);
 
+/* Live input events */
 var liveInputs = [siteInput, junctionInput, armInput, dateInput, distanceInput];
 for (var ii=0; ii<liveInputs.length; ii++){
   liveInputs[ii].addEventListener('input', function(){
     var cleaned = sanitizeSite(siteInput.value);
     if (cleaned !== siteInput.value) siteInput.value = cleaned;
-    updateTabVisibility();
+    resultsUnlocked = false;
     renderDisplay();
+    updateTabVisibility();
     updateEndSurveyColor();
   }, false);
   liveInputs[ii].addEventListener('change', function(){
-    updateTabVisibility();
+    resultsUnlocked = false;
     renderDisplay();
+    updateTabVisibility();
     updateEndSurveyColor();
   }, false);
 }
 
-/* ------- Init ------- */
+/* Init */
 setDefaultDateIfEmpty();
 renderDisplay();
 updateTabVisibility();
+updateMetricsBars();
+updateQualityBadge();
 showTab('detailsTab');
-
-/* ------- Self-tests (console) ------- */
-(function runSelfTests(){
-  try {
-    var tests = [];
-    tests.push(['toggleHandler is function', typeof window.toggleHandler === 'function']);
-    tests.push(['renderDisplay is function', typeof renderDisplay === 'function']);
-    tests.push(['startMeasurement is function', typeof startMeasurement === 'function']);
-    tests.push(['finishMeasurement is function', typeof finishMeasurement === 'function']);
-    tests.push(['gating - details invalid hides measure/results', (function(){ var ok = document.getElementById('measureTabBtn').disabled && document.getElementById('resultsTabBtn').disabled; return ok; })()]);
-
-    var failed = [];
-    for (var t=0;t<tests.length;t++){ if (!tests[t][1]) failed.push(tests[t][0]); }
-    if (failed.length) {
-      console.warn('[MOVA TEST] Some checks failed:', failed);
-    } else {
-      console.log('[MOVA TEST] All checks passed');
-    }
-  } catch (err) {
-    console.warn('[MOVA TEST] Error during tests', err);
-  }
-})();
 </script>
 </body>
 </html>
