@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Speed Measurement Survey</title>
+<style>
+body { font-family: Arial, sans-serif; text-align: center; margin: 20px; }
+canvas { border: 2px solid #333; background: #fff; display: block; margin: 0 auto 12px auto; max-width:100%; height:auto; }
+input, button { margin: 6px; padding: 8px 14px; font-size: 18px; }
+fieldset { border:1px solid #999; padding: 10px 12px; margin-bottom:10px; max-width:420px; margin-left:auto; margin-right:auto; }
+legend { font-weight:bold; }
+#measureBtn { font-size: 20px; padding: 10px 20px; font-weight: bold; border-radius: 6px; border: none; color: #fff; }
+#deleteLastBtn, #endSurveyBtn { font-size:16px; padding:6px 12px; }
+#endSurveyBtn { font-weight:bold; color:#fff; border:none; border-radius:6px; padding:10px 18px; }
+</style>
+</head>
+<body>
+
+<h2>Speed Measurement Survey</h2>
+
+<fieldset>
+  <legend>Junction Details</legend>
+  <label for="junction">Junction Location:</label>
+  <input type="text" id="junction" placeholder="e.g. Main St / 1st Ave"><br>
+  <label for="arm">Arm:</label>
+  <input type="text" id="arm" placeholder="e.g. North"><br>
+  <label for="date">Date:</label>
+  <input type="date" id="date">
+</fieldset>
+
+<fieldset>
+  <legend>Measurement</legend>
+  <canvas id="canvas" width="420" height="260"></canvas>
+  <label for="distance">Distance (m):</label>
+  <input type="number" id="distance" placeholder="e.g. 100" min="0" step="0.1"><br>
+  <button id="measureBtn" type="button" style="background-color:green;">Start</button>
+  <button id="deleteLastBtn" type="button">Delete Last Sample</button>
+</fieldset>
+
+<button id="endSurveyBtn" type="button" style="background-color:red;">End Survey & Save Data</button>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const distanceInput = document.getElementById('distance');
+const measureBtn = document.getElementById('measureBtn');
+const deleteLastBtn = document.getElementById('deleteLastBtn');
+const endSurveyBtn = document.getElementById('endSurveyBtn');
+const junctionInput = document.getElementById('junction');
+const armInput = document.getElementById('arm');
+const dateInput = document.getElementById('date');
+
+let measuring = false;
+let startTime = 0;
+let rafId = null;
+let lastToggleTime = 0;
+let measurements = [];
+
+function drawDisplay(lines) {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.font = "16px monospace";
+  ctx.fillStyle = "#000";
+  const lineHeight = 22;
+  const x = 10;
+  let y = 40;
+  lines.forEach(line => {
+    ctx.fillText(line, x, y);
+    y += lineHeight;
+  });
+}
+
+function renderDisplay() {
+  const lines = [];
+  if (measuring) {
+    const elapsed = ((performance.now() - startTime) / 1000).toFixed(2);
+    lines.push(`Timing... ${elapsed}s`);
+  } else if (measurements.length === 0) {
+    lines.push("Press Start to begin measuring");
+  } else {
+    lines.push(`Total Samples: ${measurements.length}`);
+  }
+  lines.push("");
+  lines.push("#  Time(s)  m/s    mph");
+  const lastSamples = measurements.slice(-5);
+  lastSamples.forEach((m, i) => {
+    const num = measurements.length - lastSamples.length + i + 1;
+    lines.push(`${num.toString().padEnd(3)}${m.time.toFixed(2).padEnd(8)}${m.speed.toFixed(2).padEnd(7)}${m.mph.toFixed(2)}`);
+  });
+  drawDisplay(lines);
+  updateEndSurveyColor();
+}
+
+function tick(now) {
+  renderDisplay();
+  rafId = requestAnimationFrame(tick);
+}
+
+function finishMeasurement() {
+  if (!measuring) return;
+  measuring = false;
+  measureBtn.textContent = "Start";
+  measureBtn.style.backgroundColor = "green";
+  if (rafId) cancelAnimationFrame(rafId);
+
+  const elapsed = (performance.now() - startTime) / 1000;
+  const distance = parseFloat(distanceInput.value) || 0;
+  const speed = (elapsed > 0) ? (distance / elapsed) : 0;
+  const mph = speed * 2.23694;
+
+  measurements.push({ distance, time: elapsed, speed, mph });
+  renderDisplay();
+}
+
+function startMeasurement() {
+  const distance = parseFloat(distanceInput.value);
+  if (isNaN(distance) || distance <= 0) {
+    alert("Enter a valid distance");
+    return;
+  }
+  measuring = true;
+  measureBtn.textContent = "Stop";
+  measureBtn.style.backgroundColor = "red";
+  startTime = performance.now();
+  rafId = requestAnimationFrame(tick);
+}
+
+function toggleHandler(e) {
+  if (e && e.preventDefault) e.preventDefault();
+  const now = performance.now();
+  if (now - lastToggleTime < 400) return;
+  lastToggleTime = now;
+  if (!measuring) startMeasurement(); else finishMeasurement();
+}
+
+function deleteLastSample() {
+  if (measurements.length === 0) {
+    alert("No sample to delete!");
+    return;
+  }
+  measurements.pop();
+  renderDisplay();
+}
+
+function percentile(sortedArray, p) {
+  if (sortedArray.length === 0) return 0;
+  const idx = (p / 100) * (sortedArray.length - 1);
+  const lower = Math.floor(idx);
+  const upper = Math.ceil(idx);
+  if (upper >= sortedArray.length) return sortedArray[lower];
+  const weight = idx - lower;
+  return sortedArray[lower] * (1 - weight) + sortedArray[upper] * weight;
+}
+
+function updateEndSurveyColor() {
+  const n = measurements.length;
+  if (n < 25) {
+    endSurveyBtn.style.backgroundColor = "red";
+  } else if (n < 50) {
+    endSurveyBtn.style.backgroundColor = "orange";
+  } else {
+    endSurveyBtn.style.backgroundColor = "green";
+  }
+}
+
+function endSurvey() {
+  if (measurements.length === 0) {
+    alert("No measurements recorded!");
+    return;
+  }
+
+  const avgSpeed = measurements.reduce((sum, m) => sum + m.speed, 0) / measurements.length;
+  const distance = parseFloat(distanceInput.value) || 0;
+  const speeds = measurements.map(m => m.speed).sort((a, b) => a - b);
+
+  const p5 = percentile(speeds, 5);
+  const p15 = percentile(speeds, 15);
+  const p85 = percentile(speeds, 85);
+
+  let content = "";
+  content += `Location: ${junctionInput.value || "N/A"}\n`;
+  content += `Arm: ${armInput.value || "N/A"}\n`;
+  content += `Date: ${dateInput.value || new Date().toISOString().split("T")[0]}\n`;
+  content += `Distance of Travel : ${distance} meters\n\n`;
+  content += "#, Time(s), Speed(m/s), Speed(mph)\n";
+  measurements.forEach((m, i) => {
+    content += `${i+1}, ${m.time.toFixed(2)}, ${m.speed.toFixed(2)}, ${m.mph.toFixed(2)}\n`;
+  });
+  content += `\nAverage Speed: ${avgSpeed.toFixed(2)} m/s (${(avgSpeed * 2.23694).toFixed(2)} mph)\n`;
+  content += `5th Percentile: ${p5.toFixed(2)} m/s (${(p5 * 2.23694).toFixed(2)} mph)\n`;
+  content += `15th Percentile: ${p15.toFixed(2)} m/s (${(p15 * 2.23694).toFixed(2)} mph)\n`;
+  content += `85th Percentile: ${p85.toFixed(2)} m/s (${(p85 * 2.23694).toFixed(2)} mph)\n`;
+
+  const blob = new Blob([content], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "speed_measurements.txt";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  alert(`Survey saved. ${measurements.length} samples recorded.`);
+}
+
+measureBtn.addEventListener('pointerup', toggleHandler);
+measureBtn.addEventListener('touchend', toggleHandler, { passive: false });
+measureBtn.addEventListener('click', toggleHandler);
+measureBtn.addEventListener('keydown', (e) => {
+  if (e.key === "Enter" || e.key === " ") {
+    e.preventDefault();
+    toggleHandler(e);
+  }
+});
+deleteLastBtn.addEventListener('click', deleteLastSample);
+endSurveyBtn.addEventListener('click', endSurvey);
+
+renderDisplay();
+</script>
+</body>
+</html>
