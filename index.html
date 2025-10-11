@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MOVA SPEED SURVEY — Aligned Results + TXT Export</title>
+<title>MOVA SPEED SURVEY — Compact Measurements Labels, Aligned Metrics</title>
 <style>
   body { font-family: Arial, sans-serif; margin: 20px; }
   h2 { text-align:center; margin-top: 0; }
@@ -49,11 +49,21 @@
   button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   body, button, input { -webkit-user-select: none; user-select: none; }
 
-  /* Results table */
-  table { border-collapse: collapse; width: 100%; max-width: 880px; margin: 8px auto; font-size: 16px; }
-  th, td { border:1px solid #ccc; padding: 6px 8px; text-align: right; }
-  th:first-child, td:first-child { text-align: left; }
-  .summary { max-width: 520px; margin: 8px auto; font-family: monospace; white-space: pre; } /* aligned style */
+  /* Results table (fixed widths to match TXT export) */
+  table.results-fixed {
+    border-collapse: collapse;
+    width: fit-content;
+    max-width: 100%;
+    margin: 8px auto;
+    font-size: 16px;
+    font-family: monospace; /* match TXT monospace */
+  }
+  table.results-fixed th, table.results-fixed td { border:1px solid #ccc; padding: 6px 8px; }
+  table.results-fixed th, table.results-fixed td { text-align: right; }
+  table.results-fixed th:first-child, table.results-fixed td:first-child { text-align: left; }
+
+  /* Summary (aligned, monospace) */
+  .summary { max-width: 520px; margin: 8px auto; font-family: monospace; white-space: pre; }
   .summary h3 { margin: 8px 0; font-family: Arial, sans-serif; font-weight: bold; white-space: normal; }
 
   .row { display:flex; gap: 10px; align-items:center; margin: 8px 0; flex-wrap: wrap; }
@@ -65,14 +75,14 @@
     padding: 8px 10px;
     border-top: 1px solid #ccc;
     display: flex;
-    justify-content: space-between;
-    gap: 12px;
-    align-items: baseline;
+    flex-direction: column; /* stack for mobile */
+    gap: 6px;
+    align-items: stretch;
     font-family: monospace;
   }
-  .metric { display:flex; gap: 6px; white-space: nowrap; }
-  .metric .label { font-weight:bold; }
-  .metric .value { min-width: 120px; text-align: right; }
+  .metric { display:flex; gap: 8px; }
+  .metric .label { font-weight:bold; min-width: 150px; }
+  .metric .value { white-space: pre; }
 
   /* Top metrics bar stacked */
   .metrics-bar-top {
@@ -89,7 +99,7 @@
   .metrics-row { display: flex; gap: 24px; align-items: baseline; width: 100%; }
   .metrics-bar-top .value { min-width: 60px; text-align: left; }
 
-  /* Bottom metrics stacked on left with aligned columns */
+  /* Bottom metrics stacked on left with aligned columns — compact labels */
   #metricsBottom {
     display: flex;
     flex-direction: column;
@@ -100,14 +110,18 @@
   }
   #metricsBottom .metric {
     display: grid;
-    grid-template-columns: 150px 1fr;
+    grid-template-columns: 90px 1fr; /* compact label column to save width */
     align-items: baseline;
-    gap: 8px;
+    gap: 4px; /* tighter gap between label and value */
   }
-  #metricsBottom .metric .label { font-weight: bold; text-align: left; }
+  #metricsBottom .metric .label {
+    font-weight: bold;
+    text-align: left;
+    white-space: nowrap;
+  }
   #metricsBottom .metric .value {
     font-family: monospace;
-    white-space: pre;
+    white-space: pre; /* preserve padding for column alignment */
     text-align: left;
   }
 
@@ -204,10 +218,10 @@
               onclick="if(window.toggleHandler){window.toggleHandler(event);} return false;">Start</button>
       <button id="deleteLastBtn" type="button">Delete Last Sample</button>
 
-      <!-- Bottom metrics stacked & aligned -->
+      <!-- Bottom metrics stacked & aligned (compact labels) -->
       <div class="metrics-bar" id="metricsBottom" aria-live="polite">
-        <div class="metric"><span class="label">Average Speed:</span><span class="value" id="avgMetric">— m/s | — mph</span></div>
-        <div class="metric"><span class="label">P85 Speed:</span><span class="value" id="p85Metric">— m/s | — mph</span></div>
+        <div class="metric"><span class="label">Avg Spd:</span><span class="value" id="avgMetric">— m/s | — mph</span></div>
+        <div class="metric"><span class="label">85%:</span><span class="value" id="p85Metric">— m/s | — mph</span></div>
       </div>
     </fieldset>
     <p class="helper one-line">Click End Survey to see results.</p>
@@ -225,10 +239,26 @@
 <span id="resultP15">15th Percentile   : — m/s | — mph</span>
 <span id="resultP05">5th Percentile    : — m/s | — mph</span>
     </div>
-    <table id="resultsTable">
-      <thead><tr><th>#</th><th>Time (s)</th><th>Speed (m/s)</th><th>Speed (mph)</th></tr></thead>
+
+    <!-- Fixed-width results table -->
+    <table id="resultsTable" class="results-fixed">
+      <colgroup>
+        <col style="width:5ch;">
+        <col style="width:10ch;">
+        <col style="width:12ch;">
+        <col style="width:12ch;">
+      </colgroup>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Time (s)</th>
+          <th>Speed (m/s)</th>
+          <th>Speed (mph)</th>
+        </tr>
+      </thead>
       <tbody></tbody>
     </table>
+
     <div style="text-align:center;">
       <button id="saveResultsBtn" type="button">Save Data (.txt)</button>
       <button id="clearDataBtn" type="button">Clear All</button>
@@ -587,7 +617,6 @@ function buildTxtContent() {
   var p15 = percentile(speeds, 15);
   var p5  = percentile(speeds, 5);
 
-  // Aligned two-column style for results
   function metricRow(label, ms){
     var val = isFinite(ms) ? (function(){
       var mps = Number(ms).toFixed(2);
@@ -604,10 +633,11 @@ function buildTxtContent() {
   lines.push(metricRow('15th Percentile', p15));
   lines.push(metricRow('5th Percentile',  p5));
 
-  return lines.join('\\n');
+  return lines.join('\n');
 }
-function sanitizeFilePart(s) { return String(s || '').replace(/[^A-Za-z0-9_-]/g, '_'); }
+function sanitizeSite(value) { return String(value || '').replace(/[^A-Za-z0-9]/g, '').slice(0,7); }
 function trunc(s, n) { return String(s || '').length <= n ? String(s || '') : String(s || '').slice(0, n); }
+function sanitizeFilePart(s) { return String(s || '').replace(/[^A-Za-z0-9_-]/g, '_'); }
 function makeFilename() {
   var d = dateInput.value ? new Date(dateInput.value) : new Date();
   var yy = String(d.getFullYear()).slice(-2);
@@ -663,10 +693,6 @@ function percentile(sortedArray, p) {
   return sortedArray[lower] * (1 - weight) + sortedArray[upper] * weight;
 }
 function updateMetricsBars(){
-  var avgMetric = document.getElementById('avgMetric');
-  var p85Metric = document.getElementById('p85Metric');
-  var countMetric = document.getElementById('countMetric');
-  var timerMetric = document.getElementById('timerMetric');
   if (countMetric) countMetric.textContent = String(measurements.length);
   if (timerMetric) {
     if (measuring) {
@@ -744,8 +770,7 @@ document.getElementById('clearDataBtn').addEventListener('click', function(){
 var liveInputs = [siteInput, junctionInput, armInput, dateInput, distanceInput];
 for (var ii=0; ii<liveInputs.length; ii++){
   liveInputs[ii].addEventListener('input', function(){
-    var value = siteInput.value || '';
-    var cleaned = value.replace(/[^A-Za-z0-9]/g, '').slice(0,7);
+    var cleaned = sanitizeSite(siteInput.value || '');
     if (cleaned !== siteInput.value) siteInput.value = cleaned;
     resultsUnlocked = false;
     renderDisplay();
