@@ -728,7 +728,7 @@ if (document.readyState === 'loading') {
         var q = qualityFromSpeeds(speeds);
 
         var out = [];
-        out.push("MOVA SPEED SURVEY v3.2");
+        out.push("MOVA SPEED SURVEY v3.3");
         out.push("Site: " + site);
         out.push("Junction: " + junction);
         out.push("Arm: " + arm);
@@ -1056,4 +1056,780 @@ if (document.readyState === 'loading') {
   document.addEventListener("DOMContentLoaded", () => setTimeout(syncAll, 0));
   ["click","input"].forEach(evt => document.addEventListener(evt, () => setTimeout(syncAll, 0), true));
   setTimeout(syncAll, 0);
+})();
+
+
+/* ==== Chip-Referenced Quality (v3.2.1) ====
+   Use the Measurements tab quality chip text verbatim for Results + save.
+*/
+(function(){
+  function chipQualityText(){
+    var chip = document.getElementById("qualityInline");
+    if (!chip) return "—";
+    var t = (chip.textContent || "").trim();
+    // Expect "Quality: <Label>"
+    var i = t.indexOf(":");
+    return (i >= 0 ? t.slice(i+1) : t).trim() || "—";
+  }
+  function updateResultsQualityFromChip(){
+    var el = document.getElementById("resultQuality");
+    if (!el) return;
+    el.textContent = "Quality: " + chipQualityText();
+    if (typeof window.__formatSummaryAlignment === "function"){
+      setTimeout(window.__formatSummaryAlignment, 0);
+    }
+  }
+
+  // Keep Results line synced whenever UI changes likely affect chip
+  function bindSync(){
+    var ids = ["endSurveyBtn","resultsTabBtn","measureTabBtn","clearDataBtn","deleteLastBtn","measureBtn"];
+    ids.forEach(function(id){
+      var btn = document.getElementById(id);
+      if (btn) btn.addEventListener("click", function(){ setTimeout(updateResultsQualityFromChip, 0); }, true);
+    });
+    // Also re-sync on generic input changes
+    document.addEventListener("input", function(){ setTimeout(updateResultsQualityFromChip, 0); }, true);
+    // Initial sync
+    setTimeout(updateResultsQualityFromChip, 0);
+  }
+  if (document.readyState === "loading"){
+    document.addEventListener("DOMContentLoaded", bindSync);
+  } else {
+    bindSync();
+  }
+
+  // Override save to use chip text
+  function installSaveOverride(){
+    var saveBtn = document.getElementById("saveResultsBtn");
+    if (!saveBtn) return;
+    saveBtn.addEventListener("click", function(ev){
+      try{
+        ev.preventDefault(); ev.stopImmediatePropagation();
+        // Collect data for saving (reuse existing DOM)
+        function toNumber(x){ var n = Number(x); return Number.isFinite(n) ? n : NaN; }
+        function mpsToMph(mps){ return Number.isFinite(mps) ? mps * 2.2369362921 : NaN; }
+
+        var site = (document.getElementById("site")||{}).value || "";
+        var dist = toNumber((document.getElementById("distance")||{}).value || "");
+        var date = (document.getElementById("date")||{}).value || "";
+        var junction = (document.getElementById("junction")||{}).value || "";
+        var arm = (document.getElementById("arm")||{}).value || "";
+
+        var rows = Array.from(document.querySelectorAll("#resultsTable tbody tr"));
+        var out = [];
+        out.push("MOVA SPEED SURVEY v3.3");
+        out.push("Site: " + site);
+        out.push("Junction: " + junction);
+        out.push("Arm: " + arm);
+        out.push("Date: " + date);
+        out.push("Distance (m): " + (Number.isFinite(dist) ? dist : ""));
+
+        // Max speed (recompute from table to avoid stale)
+        var speeds = [];
+        rows.forEach(function(tr){
+          var tds = tr.querySelectorAll("td");
+          var t = toNumber((tds[1]?.textContent||"").trim());
+          var mps = toNumber((tds[2]?.textContent||"").trim());
+          if (!Number.isFinite(mps) && Number.isFinite(dist) && Number.isFinite(t) && t>0){
+            mps = dist / t;
+          }
+          if (Number.isFinite(mps)) speeds.push(mps);
+        });
+        var maxSpd = speeds.length ? Math.max.apply(null, speeds) : NaN;
+        out.push("Max speed: " + (Number.isFinite(maxSpd)?maxSpd.toFixed(2):"") + " m/s | " + (Number.isFinite(maxSpd)?(maxSpd*2.2369362921).toFixed(2):"") + " mph");
+
+        // Quality from chip
+        out.push("Quality: " + chipQualityText());
+
+        out.push("");
+        out.push("#\tTime (s)\tSpeed (m/s)\tSpeed (mph)");
+        rows.forEach(function(tr, i){
+          var tds = tr.querySelectorAll("td");
+          var t = toNumber((tds[1]?.textContent||"").trim());
+          var mps = toNumber((tds[2]?.textContent||"").trim());
+          if (!Number.isFinite(mps) && Number.isFinite(dist) && Number.isFinite(t) && t>0){
+            mps = dist / t;
+          }
+          var mph = mpsToMph(mps);
+          out.push((i+1) + "\t" + (Number.isFinite(t)?t.toFixed(2):"") + "\t" + (Number.isFinite(mps)?mps.toFixed(2):"") + "\t" + (Number.isFinite(mph)?mph.toFixed(2):""));
+        });
+
+        var blob = new Blob([out.join("\n")], {type:"text/plain;charset=utf-8"});
+        var a = document.createElement("a");
+        a.download = (site || "mova_survey") + "_" + Date.now() + ".txt";
+        a.href = URL.createObjectURL(blob);
+        a.click();
+        URL.revokeObjectURL(a.href);
+      }catch(e){ console.error(e); }
+    }, true);
+  }
+  if (document.readyState === "loading"){
+    document.addEventListener("DOMContentLoaded", installSaveOverride);
+  } else {
+    installSaveOverride();
+  }
+})();
+
+
+/* === v3.2.2: Enforce exactly one space after ':' in Results summary === */
+(function(){
+  window.__formatSummaryAlignment = function(){
+    var ids = ["resultAvg","resultP85","resultP15","resultP05","resultMax","resultSD","resultQuality"];
+    var rows = [];
+    ids.forEach(function(id){
+      var el = document.getElementById(id);
+      if (!el) return;
+      var text = (el.textContent || "").trim();
+      var idx = text.indexOf(":");
+      var label = idx>=0 ? text.slice(0,idx).trim() : text;
+      var value = idx>=0 ? text.slice(idx+1).trim() : "";
+      // remove any leading spaces to guarantee only ONE space after ':'
+      value = value.replace(/^\s+/, "");
+      rows.push([el,label,value]);
+    });
+    if (!rows.length) return;
+    // Align labels only (no extra spaces added at start of value)
+    var maxLen = rows.reduce(function(m, r){ return Math.max(m, r[1].length); }, 0);
+    rows.forEach(function(r){
+      var pad = Math.max(0, maxLen - r[1].length);
+      r[0].textContent = r[1] + " ".repeat(pad) + ": " + r[2];
+    });
+  };
+  // Run on load
+  if (document.readyState === "loading"){
+    document.addEventListener("DOMContentLoaded", function(){ setTimeout(window.__formatSummaryAlignment, 0); });
+  } else {
+    setTimeout(window.__formatSummaryAlignment, 0);
+  }
+  // Re-run when results tab is shown
+  var resBtn = document.getElementById("resultsTabBtn");
+  if (resBtn){ resBtn.addEventListener("click", function(){ setTimeout(window.__formatSummaryAlignment, 0); }); }
+})();
+
+
+/* === v3.2.3: Strict single-space formatting for value pairs and after ':' === */
+(function(){
+  function formatValuePair(value){
+    // Expect: "<x> m/s | <y> mph" possibly with extra spaces
+    var m = value.match(/([-+]?\d+(?:\.\d+)?)\s*m\/s\s*\|\s*([-+]?\d+(?:\.\d+)?)\s*mph/i);
+    if (!m) return value.trim(); // non-pair lines (e.g., SD, Quality)
+    var mps = Number(m[1]);
+    var mph = Number(m[2]);
+    if (!Number.isFinite(mps) || !Number.isFinite(mph)) return value.trim();
+    // EXACT pattern with one space everywhere
+    return mps.toFixed(2) + " m/s | " + mph.toFixed(2) + " mph";
+  }
+
+  window.__formatSummaryAlignment = function(){
+    var ids = ["resultAvg","resultP85","resultP15","resultP05","resultMax","resultSD","resultQuality"];
+    var rows = [];
+    ids.forEach(function(id){
+      var el = document.getElementById(id);
+      if (!el) return;
+      var text = (el.textContent || "").trim();
+      var idx = text.indexOf(":");
+      var label = idx>=0 ? text.slice(0,idx).trim() : text;
+      var value = idx>=0 ? text.slice(idx+1).trim() : "";
+      value = formatValuePair(value); // normalize pair spacing
+      rows.push([el,label,value]);
+    });
+    if (!rows.length) return;
+    var maxLen = rows.reduce(function(m, r){ return Math.max(m, r[1].length); }, 0);
+    rows.forEach(function(r){
+      var pad = Math.max(0, maxLen - r[1].length);
+      r[0].textContent = r[1] + " ".repeat(pad) + ": " + r[2]; // exactly one space after ':'
+    });
+  };
+
+  function runAlign(){ if (typeof window.__formatSummaryAlignment === "function") window.__formatSummaryAlignment(); }
+
+  if (document.readyState === "loading"){
+    document.addEventListener("DOMContentLoaded", function(){ setTimeout(runAlign, 0); });
+  } else {
+    setTimeout(runAlign, 0);
+  }
+  var resBtn = document.getElementById("resultsTabBtn");
+  if (resBtn){ resBtn.addEventListener("click", function(){ setTimeout(runAlign, 0); }); }
+})();
+
+
+/* === v3.2.3: Race-free chip-driven quality sync === */
+(function(){
+  const Q_CHIP_ID = "qualityInline";
+  const Q_RESULTS_ID = "resultQuality";
+
+  function getChip(){ return document.getElementById(Q_CHIP_ID); }
+  function getRes(){
+    var el = document.getElementById(Q_RESULTS_ID);
+    if (!el){
+      var cont = document.querySelector(".summary");
+      if (cont){ el = document.createElement("span"); el.id = Q_RESULTS_ID; cont.appendChild(el); }
+    }
+    return el;
+  }
+
+  function chipText(){
+    const chip = getChip();
+    if (!chip) return "—";
+    const t = (chip.textContent || "").trim();
+    const i = t.indexOf(":");
+    return (i >= 0 ? t.slice(i+1) : t).trim() || "—";
+  }
+
+  function writeResultsFromChip(){
+    const el = getRes();
+    if (!el) return;
+    el.textContent = "Quality: " + chipText();
+    if (typeof window.__formatSummaryAlignment === "function"){
+      requestAnimationFrame(() => window.__formatSummaryAlignment());
+    }
+  }
+
+  function installObserver(){
+    const chip = getChip();
+    if (!chip) return;
+    if (window.__qualityChipObserver) { try { window.__qualityChipObserver.disconnect(); } catch(e){} }
+    const mo = new MutationObserver(writeResultsFromChip);
+    mo.observe(chip, { characterData: true, subtree: true, childList: true });
+    window.__qualityChipObserver = mo;
+  }
+
+  function bindTriggers(){
+    const ids = ["endSurveyBtn","resultsTabBtn","measureTabBtn","clearDataBtn","deleteLastBtn","measureBtn"];
+    ids.forEach(id => {
+      const b = document.getElementById(id);
+      if (b) b.addEventListener("click", () => setTimeout(writeResultsFromChip, 0), true);
+    });
+    document.addEventListener("input", () => setTimeout(writeResultsFromChip, 0), true);
+  }
+
+  // Override any other calculators to ALWAYS mirror the chip
+  window.qualityFromSpeeds = function(){ return { label: chipText(), cls: "" }; };
+  window.qualityLabelFromSamples = function(){ return { label: chipText(), cls: "" }; };
+
+  function init(){
+    installObserver();
+    bindTriggers();
+    requestAnimationFrame(writeResultsFromChip); // ensure we win over any earlier writes
+  }
+
+  if (document.readyState === "loading"){
+    document.addEventListener("DOMContentLoaded", init, { once: true });
+  } else {
+    init();
+  }
+})();
+
+
+/* === v3.2.x: Fully render Results tab when shown or End Survey is clicked ===
+   Forces a full, ordered render so quality and spacing are always correct.
+*/
+(function(){
+  const SUMMARY_IDS = ["resultAvg","resultP85","resultP15","resultP05","resultMax","resultSD","resultQuality"];
+
+  function ensureResultQualityEl(){
+    let el = document.getElementById("resultQuality");
+    if (!el){
+      const cont = document.querySelector(".summary");
+      if (cont){
+        el = document.createElement("span");
+        el.id = "resultQuality";
+        cont.appendChild(el);
+      }
+    }
+    return el;
+  }
+
+  function chipQualityText(){
+    const chip = document.getElementById("qualityInline");
+    if (!chip) return "—";
+    const t = (chip.textContent || "").trim();
+    const i = t.indexOf(":");
+    return (i >= 0 ? t.slice(i+1) : t).trim() || "—";
+  }
+
+  function normalizePair(value){
+    const m = String(value).match(/([-+]?\d+(?:\.\d+)?)\s*m\/s\s*\|\s*([-+]?\d+(?:\.\d+)?)\s*mph/i);
+    if (!m) return String(value).trim();
+    const mps = Number(m[1]), mph = Number(m[2]);
+    if (!Number.isFinite(mps) || !Number.isFinite(mph)) return String(value).trim();
+    return mps.toFixed(2) + " m/s | " + mph.toFixed(2) + " mph";
+  }
+
+  function formatSummaryAlignment(){
+    const rows = [];
+    for (const id of SUMMARY_IDS){
+      const el = document.getElementById(id);
+      if (!el) continue;
+      const text = (el.textContent || "").trim();
+      const idx = text.indexOf(":");
+      const label = idx>=0 ? text.slice(0,idx).trim() : text;
+      let value = idx>=0 ? text.slice(idx+1).trim() : "";
+      value = normalizePair(value.replace(/^\s+/, "")); // exactly one space after ':'
+      rows.push([el,label,value]);
+    }
+    if (!rows.length) return;
+    const maxLen = rows.reduce((m, r) => Math.max(m, r[1].length), 0);
+    rows.forEach(([el,label,value]) => {
+      const pad = Math.max(0, maxLen - label.length);
+      el.textContent = label + " ".repeat(pad) + ": " + value;
+    });
+  }
+
+  function renderResultsTabNow(){
+    if (typeof window.renderResults === "function") {
+      window.renderResults();
+    }
+    const qEl = ensureResultQualityEl();
+    if (qEl) qEl.textContent = "Quality: " + chipQualityText();
+    formatSummaryAlignment();
+  }
+
+  (function patchActivateTab(){
+    const prev = window.activateTab;
+    if (typeof prev === "function" && !prev.__patched_full_results){
+      const wrapped = function(tabId){
+        prev.apply(this, arguments);
+        if (tabId === "resultsTab") {
+          requestAnimationFrame(renderResultsTabNow);
+        }
+      };
+      wrapped.__patched_full_results = true;
+      window.activateTab = wrapped;
+    } else if (typeof prev !== "function") {
+      const btn = document.getElementById("resultsTabBtn");
+      if (btn && !btn.__bound_full_results){
+        btn.addEventListener("click", () => requestAnimationFrame(renderResultsTabNow), true);
+        btn.__bound_full_results = true;
+      }
+    }
+  })();
+
+  (function patchEndSurvey(){
+    const prev = window.endSurvey;
+    if (typeof prev === "function" && !prev.__patched_full_results){
+      const wrapped = function(){
+        prev.apply(this, arguments);
+        requestAnimationFrame(renderResultsTabNow);
+      };
+      wrapped.__patched_full_results = true;
+      window.endSurvey = wrapped;
+    } else {
+      const btn = document.getElementById("endSurveyBtn");
+      if (btn && !btn.__bound_full_results){
+        btn.addEventListener("click", () => requestAnimationFrame(renderResultsTabNow), true);
+        btn.__bound_full_results = true;
+      }
+    }
+  })();
+
+  if (document.readyState === "loading"){
+    document.addEventListener("DOMContentLoaded", () => requestAnimationFrame(renderResultsTabNow), { once:true });
+  } else {
+    requestAnimationFrame(renderResultsTabNow);
+  }
+})();
+
+
+/* === v3.2.5: Save .txt formatting fix (clean tabs, stable decimals, CRLF) === */
+(function(){
+  function toNumber(x){ var n = Number(x); return Number.isFinite(n) ? n : NaN; }
+  function mpsToMph(mps){ return Number.isFinite(mps) ? mps * 2.2369362921 : NaN; }
+  function fmt(n, d){ return Number.isFinite(n) ? n.toFixed(d) : ""; }
+
+  function buildTxt(){
+    var site = (document.getElementById("site")||{}).value || "";
+    var dist = toNumber((document.getElementById("distance")||{}).value || "");
+    var date = (document.getElementById("date")||{}).value || "";
+    var junction = (document.getElementById("junction")||{}).value || "";
+    var arm = (document.getElementById("arm")||{}).value || "";
+
+    var rows = Array.from(document.querySelectorAll("#resultsTable tbody tr"));
+    var lines = [];
+    var EOL = "\r\n"; // ensure good Windows/Notepad rendering
+
+    lines.push("MOVA SPEED SURVEY v3.3" + EOL);
+    lines.push("Site: " + site + EOL);
+    lines.push("Junction: " + junction + EOL);
+    lines.push("Arm: " + arm + EOL);
+    lines.push("Date: " + date + EOL);
+    lines.push("Distance (m): " + (Number.isFinite(dist) ? dist : "") + EOL);
+
+    // Compute max speed from the table (fallback compute from time if needed)
+    var maxSpd = NaN;
+    rows.forEach(function(tr){
+      var tds = tr.querySelectorAll("td");
+      var t = toNumber((tds[1]?.textContent||"").trim());
+      var mps = toNumber((tds[2]?.textContent||"").trim());
+      if (!Number.isFinite(mps) && Number.isFinite(dist) && Number.isFinite(t) && t > 0){
+        mps = dist / t;
+      }
+      if (Number.isFinite(mps)){
+        if (!Number.isFinite(maxSpd) || mps > maxSpd) maxSpd = mps;
+      }
+    });
+    lines.push("Max speed: " + (Number.isFinite(maxSpd)?fmt(maxSpd,2):"") + " m/s | " + (Number.isFinite(maxSpd)?fmt(mpsToMph(maxSpd),2):"") + " mph" + EOL);
+
+    // Mirror the chip's quality text exactly
+    var chip = document.getElementById("qualityInline");
+    var qText = "—";
+    if (chip){
+      var t = (chip.textContent || "").trim();
+      var i = t.indexOf(":");
+      qText = (i >= 0 ? t.slice(i+1) : t).trim() || "—";
+    }
+    lines.push("Quality: " + qText + EOL);
+
+    lines.push(EOL);
+    lines.push("#\tTime (s)\tSpeed (m/s)\tSpeed (mph)" + EOL);
+
+    rows.forEach(function(tr, i){
+      var tds = tr.querySelectorAll("td");
+      var t = toNumber((tds[1]?.textContent||"").trim());
+      var mps = toNumber((tds[2]?.textContent||"").trim());
+      if (!Number.isFinite(mps) && Number.isFinite(dist) && Number.isFinite(t) && t > 0){
+        mps = dist / t;
+      }
+      var mph = mpsToMph(mps);
+      // Strict tab-separated columns with fixed decimals, no extra spaces
+      lines.push((i+1) + "\t" + fmt(t,2) + "\t" + fmt(mps,2) + "\t" + fmt(mph,2) + EOL);
+    });
+
+    return lines.join("");
+  }
+
+  function installSaveFix(){
+    var btn = document.getElementById("saveResultsBtn");
+    if (!btn) return;
+    // Capture-phase handler to override any earlier saves cleanly
+    btn.addEventListener("click", function(ev){
+      try{
+        ev.preventDefault(); ev.stopImmediatePropagation();
+        var txt = buildTxt();
+        var site = (document.getElementById("site")||{}).value || "mova_survey";
+        var blob = new Blob([txt], {type:"text/plain;charset=utf-8"});
+        var a = document.createElement("a");
+        a.download = site + "_" + Date.now() + ".txt";
+        a.href = URL.createObjectURL(blob);
+        a.click();
+        URL.revokeObjectURL(a.href);
+      }catch(e){ console.error(e); }
+    }, true);
+  }
+
+  if (document.readyState === "loading"){
+    document.addEventListener("DOMContentLoaded", installSaveFix);
+  } else {
+    installSaveFix();
+  }
+})();
+
+
+/* === v3.2.6: Monospaced, user-readable .txt export with aligned columns ===
+   - Fixed-width, right-aligned numeric columns
+   - CRLF line endings for Notepad compatibility
+   - Exactly one space after ':' in labels
+   - Mirrors chip quality, and uses current results values
+*/
+(function(){
+  function toNumber(x){ var n = Number(x); return Number.isFinite(n) ? n : NaN; }
+  function fmt(n, d){ return Number.isFinite(n) ? n.toFixed(d) : ""; }
+  function mphFrom(mps){ return Number.isFinite(mps) ? mps * 2.2369362921 : NaN; }
+  function padLeft(s, w){ s = String(s); return s.length >= w ? s : " ".repeat(w - s.length) + s; }
+  function padRight(s, w){ s = String(s); return s.length >= w ? s : s + " ".repeat(w - s.length); }
+
+  function chipQualityText(){
+    var chip = document.getElementById("qualityInline");
+    if (!chip) return "—";
+    var t = (chip.textContent || "").trim();
+    var i = t.indexOf(":");
+    return (i >= 0 ? t.slice(i+1) : t).trim() || "—";
+  }
+
+  function collectRows(){
+    var dist = toNumber((document.getElementById("distance")||{}).value || "");
+    var trs = Array.from(document.querySelectorAll("#resultsTable tbody tr"));
+    return trs.map(function(tr, i){
+      var tds = tr.querySelectorAll("td");
+      var t = toNumber((tds[1]?.textContent||"").trim());
+      var mps = toNumber((tds[2]?.textContent||"").trim());
+      if (!Number.isFinite(mps) && Number.isFinite(dist) && Number.isFinite(t) && t > 0){
+        mps = dist / t;
+      }
+      var mph = mphFrom(mps);
+      return {
+        idx: i + 1,
+        time: Number.isFinite(t) ? t : NaN,
+        mps: Number.isFinite(mps) ? mps : NaN,
+        mph: Number.isFinite(mph) ? mph : NaN
+      };
+    });
+  }
+
+  function buildMonospaceTxt(){
+    var EOL = "\r\n";
+    var site = (document.getElementById("site")||{}).value || "";
+    var date = (document.getElementById("date")||{}).value || "";
+    var junction = (document.getElementById("junction")||{}).value || "";
+    var arm = (document.getElementById("arm")||{}).value || "";
+    var dist = toNumber((document.getElementById("distance")||{}).value || "");
+
+    var rows = collectRows();
+    var speeds = rows.map(r => r.mps).filter(Number.isFinite);
+    var maxSpd = speeds.length ? Math.max.apply(null, speeds) : NaN;
+    var avgSpd = speeds.length ? speeds.reduce((a,b)=>a+b,0)/speeds.length : NaN;
+    // Percentiles
+    function percentile(sorted, p){
+      if (!sorted.length) return NaN;
+      var rank = (p/100) * (sorted.length - 1);
+      var lo = Math.floor(rank), hi = Math.ceil(rank);
+      if (lo === hi) return sorted[lo];
+      var t = rank - lo;
+      return sorted[lo]*(1-t) + sorted[hi]*t;
+    }
+    var sorted = speeds.slice().sort((a,b)=>a-b);
+    var p85 = percentile(sorted, 85);
+    var p15 = percentile(sorted, 15);
+    var p05 = percentile(sorted, 5);
+
+    // Header
+    var out = [];
+    out.push("MOVA SPEED SURVEY v3.3" + EOL);
+    out.push("Site: " + site + EOL);
+    out.push("Junction: " + junction + EOL);
+    out.push("Arm: " + arm + EOL);
+    out.push("Date: " + date + EOL);
+    out.push("Distance (m): " + (Number.isFinite(dist) ? dist : "") + EOL);
+    out.push(EOL);
+
+    // Summary (aligned label column)
+    var summary = [
+      ["Average speed", fmt(avgSpd,2) + " m/s | " + fmt(mphFrom(avgSpd),2) + " mph"],
+      ["85th percentile", fmt(p85,2) + " m/s | " + fmt(mphFrom(p85),2) + " mph"],
+      ["15th percentile", fmt(p15,2) + " m/s | " + fmt(mphFrom(p15),2) + " mph"],
+      ["5th percentile",  fmt(p05,2) + " m/s | " + fmt(mphFrom(p05),2) + " mph"],
+      ["Max speed",       fmt(maxSpd,2) + " m/s | " + fmt(mphFrom(maxSpd),2) + " mph"],
+      ["Quality",         chipQualityText()]
+    ];
+    var maxLabel = summary.reduce((m, r)=>Math.max(m, r[0].length), 0);
+    out.push("Results Summary" + EOL);
+    summary.forEach(function(row){
+      var label = padRight(row[0], maxLabel);
+      out.push(label + ": " + row[1] + EOL);
+    });
+    out.push(EOL);
+
+    // Table
+    // Determine widths
+    var wIdx = Math.max(1, String(rows.length || 1).length);
+    var wTime = Math.max("Time (s)".length, 7);
+    var wMps  = Math.max("Speed (m/s)".length, 11);
+    var wMph  = Math.max("Speed (mph)".length, 11);
+
+    // Build header and separator
+    var header = [
+      padRight("#", wIdx),
+      padRight("Time (s)", wTime),
+      padRight("Speed (m/s)", wMps),
+      padRight("Speed (mph)", wMph)
+    ].join("  ");
+    var sep = [
+      "-".repeat(wIdx),
+      "-".repeat(wTime),
+      "-".repeat(wMps),
+      "-".repeat(wMph)
+    ].join("  ");
+    out.push(header + EOL);
+    out.push(sep + EOL);
+
+    // Rows
+    rows.forEach(function(r){
+      var cIdx = padLeft(r.idx, wIdx);
+      var cTime = padLeft(fmt(r.time,2), wTime);
+      var cMps  = padLeft(fmt(r.mps,2), wMps);
+      var cMph  = padLeft(fmt(r.mph,2), wMph);
+      out.push([cIdx, cTime, cMps, cMph].join("  ") + EOL);
+    });
+
+    return out.join("");
+  }
+
+  function installMonospaceSave(){
+    var btn = document.getElementById("saveResultsBtn");
+    if (!btn) return;
+    btn.addEventListener("click", function(ev){
+      try{
+        ev.preventDefault(); ev.stopImmediatePropagation();
+        var txt = buildMonospaceTxt();
+        var site = (document.getElementById("site")||{}).value || "mova_survey";
+        var blob = new Blob([txt], {type:"text/plain;charset=utf-8"});
+        var a = document.createElement("a");
+        a.download = site + "_" + Date.now() + ".txt";
+        a.href = URL.createObjectURL(blob);
+        a.click();
+        URL.revokeObjectURL(a.href);
+      }catch(e){ console.error(e); }
+    }, true);
+  }
+
+  if (document.readyState === "loading"){
+    document.addEventListener("DOMContentLoaded", installMonospaceSave);
+  } else {
+    installMonospaceSave();
+  }
+})();
+
+
+/* === v3.2.7: Force single save handler (remove old listeners) + hard CRLF === */
+(function(){
+  function installSingleSaveHandler(buildTxtFn){
+    var old = document.getElementById("saveResultsBtn");
+    if (!old) return;
+    // Replace the button node to drop any previously attached listeners
+    var parent = old.parentNode;
+    var clone = old.cloneNode(true);
+    clone.id = "saveResultsBtn"; // keep same id
+    parent.replaceChild(clone, old);
+
+    function doSave(ev){
+      try{
+        ev.preventDefault(); ev.stopImmediatePropagation();
+        var txt = buildTxtFn();
+        // Ensure literal CRLF newlines in the Blob
+        txt = txt.replace(/\r?\n/g, "\r\n");
+        var site = (document.getElementById("site")||{}).value || "mova_survey";
+        var blob = new Blob([txt], {type:"text/plain;charset=utf-8"});
+        var a = document.createElement("a");
+        a.download = site + "_" + Date.now() + ".txt";
+        a.href = URL.createObjectURL(blob);
+        a.click();
+        URL.revokeObjectURL(a.href);
+      }catch(e){ console.error(e); }
+    }
+    // Attach our single authoritative handler
+    clone.addEventListener("click", doSave, true);
+  }
+
+  // If our v3.2.6 builder exists, wire it up via the single handler
+  if (typeof window !== "undefined"){
+    var install = function(){
+      if (typeof buildMonospaceTxt === "function"){
+        installSingleSaveHandler(buildMonospaceTxt);
+      }
+    };
+    if (document.readyState === "loading"){
+      document.addEventListener("DOMContentLoaded", install);
+    } else {
+      install();
+    }
+  }
+})();
+
+
+/* === v3.3: Readable line-by-line save (true CRLF, aligned) === */
+(function(){
+  function toNumber(x){ const n=Number(x); return Number.isFinite(n)?n:NaN; }
+  function fmt(n,d){ return Number.isFinite(n)? n.toFixed(d):""; }
+  function mph(mps){ return Number.isFinite(mps)? mps*2.2369362921:NaN; }
+  function padR(s,w){ s=String(s); return s.length>=w? s : s+" ".repeat(w-s.length); }
+  function padL(s,w){ s=String(s); return s.length>=w? s : " ".repeat(w-s.length)+s; }
+
+  function chipQualityText(){
+    const chip=document.getElementById("qualityInline");
+    if(!chip) return "—";
+    const t=(chip.textContent||"").trim();
+    const i=t.indexOf(":");
+    return (i>=0?t.slice(i+1):t).trim()||"—";
+  }
+
+  function collectRows(){
+    const dist=toNumber((document.getElementById("distance")||{}).value||"");
+    const trs=Array.from(document.querySelectorAll("#resultsTable tbody tr"));
+    return trs.map((tr,i)=>{
+      const tds=tr.querySelectorAll("td");
+      const t=toNumber((tds[1]?.textContent||"").trim());
+      let mps=toNumber((tds[2]?.textContent||"").trim());
+      if(!Number.isFinite(mps)&&Number.isFinite(t)&&t>0&&Number.isFinite(dist)) mps=dist/t;
+      return { idx:i+1, t, mps, mph:mph(mps) };
+    });
+  }
+
+  function buildText(){
+    const EOL = "\r\n";
+    const lines = [];
+
+    const site=(document.getElementById("site")||{}).value||"";
+    const junction=(document.getElementById("junction")||{}).value||"";
+    const arm=(document.getElementById("arm")||{}).value||"";
+    const date=(document.getElementById("date")||{}).value||"";
+    const dist=toNumber((document.getElementById("distance")||{}).value||"");
+
+    const rows=collectRows();
+    const speeds=rows.map(r=>r.mps).filter(Number.isFinite);
+    const maxSpd=speeds.length?Math.max(...speeds):NaN;
+    const avg=speeds.length?speeds.reduce((a,b)=>a+b,0)/speeds.length:NaN;
+    const sd=(function(){
+      if(speeds.length<2) return NaN;
+      const m=avg; const v=speeds.reduce((a,b)=>a+(b-m)**2,0)/(speeds.length-1);
+      return Math.sqrt(v);
+    })();
+
+    const labelW = 18;
+
+    lines.push("MOVA SPEED SURVEY v3.3");
+    lines.push("");
+    lines.push(padR("Site",labelW)+": "+site);
+    lines.push(padR("Junction",labelW)+": "+junction);
+    lines.push(padR("Arm",labelW)+": "+arm);
+    lines.push(padR("Date",labelW)+": "+date);
+    lines.push(padR("Distance (m)",labelW)+": "+(Number.isFinite(dist)?dist:""));
+    lines.push(padR("Max speed",labelW)+": "+fmt(maxSpd,2)+" m/s | "+fmt(mph(maxSpd),2)+" mph");
+    lines.push("");
+    lines.push(padR("Standard deviation (m/s)",labelW)+": "+fmt(sd,3));
+    lines.push(padR("Quality",labelW)+": "+chipQualityText());
+    lines.push("");
+
+    // Tabular data (tabs + padded numeric columns for monospaced editors)
+    const wTime=7, wMps=11, wMph=11;
+    lines.push("#\tTime (s)\tSpeed (m/s)\tSpeed (mph)");
+    rows.forEach(r=>{
+      lines.push(
+        r.idx + "\t" +
+        padL(fmt(r.t,2), wTime) + "\t" +
+        padL(fmt(r.mps,2), wMps) + "\t" +
+        padL(fmt(r.mph,2), wMph)
+      );
+    });
+
+    // Join with TRUE CRLF newlines
+    return lines.join(EOL);
+  }
+
+  function installSave(){
+    const btn=document.getElementById("saveResultsBtn");
+    if(!btn) return;
+    const parent=btn.parentNode;
+    const clone=btn.cloneNode(true);
+    parent.replaceChild(clone, btn);
+
+    clone.addEventListener("click", (ev)=>{
+      try{
+        ev.preventDefault(); ev.stopImmediatePropagation();
+        const text = buildText();
+        const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+        const site=(document.getElementById("site")||{}).value||"mova_survey";
+        const a=document.createElement("a");
+        a.download = site + "_" + Date.now() + ".txt";
+        a.href = URL.createObjectURL(blob);
+        a.click();
+        URL.revokeObjectURL(a.href);
+      }catch(e){ console.error(e); }
+    }, true);
+  }
+
+  if (document.readyState === "loading"){
+    document.addEventListener("DOMContentLoaded", installSave, { once:true });
+  } else {
+    installSave();
+  }
 })();
