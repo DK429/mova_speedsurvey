@@ -82,7 +82,7 @@ body, button, input { -webkit-user-select: none; user-select: none; }
 .metrics-row { display: flex; gap: 24px; align-items: baseline; }
 .metrics-row--top { justify-content: space-between; align-items: center; }
 .metric { display:flex; gap: 10px; }
-.metric .label { font-weight:700; min-width: 110px; }
+.metric .label { font-weight:700; min-width: 110px; white-space: pre; display: inline-block; }
 .metric .value { white-space: pre; text-align:left; }
 
 .quality-chip {
