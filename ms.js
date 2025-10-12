@@ -181,7 +181,7 @@ function drawLines(lines) {
   ctx.font = '16px monospace';
   ctx.fillStyle = '#000';
   var hasIntro = (measurements.length === 0);
-  var y = hasIntro ? 36 : 24;
+  var y = hasIntro ? 24 : 12;
   var x = 12;
   for (var i=0;i<lines.length;i++){ ctx.fillText(lines[i], x, y); y += 22; }
 }
@@ -195,7 +195,7 @@ function renderDisplay() {
   lines.push('');
   lines.push('#   Time(s)  m/s    mph');
 
-  var shown = Math.min(6, measurements.length);
+  var shown = Math.min(8, measurements.length);
   for (var i=0; i<shown; i++){
     var idx = measurements.length - 1 - i;
     var m = measurements[idx];
