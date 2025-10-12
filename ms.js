@@ -54,6 +54,34 @@ var rafId = null;
 var measurements = [];
 var resultsUnlocked = false;
 
+/* ===== Metric label alignment ===== */
+function alignMetricGroup(labelNodes) {
+  if (!labelNodes || !labelNodes.length) return;
+  var labels = [];
+  var longest = 0;
+  for (var i = 0; i < labelNodes.length; i++) {
+    var el = labelNodes[i];
+    var raw = (el.textContent || '').replace(/:\s*$/, '').trim();
+    labels.push({ el: el, label: raw });
+    if (raw.length > longest) longest = raw.length;
+  }
+  var widthCh = longest + 2; // 1 space + colon
+  for (var j = 0; j < labels.length; j++) {
+    var L = labels[j].label;
+    var pad = Array(longest - L.length + 2).join(' ');
+    labels[j].el.textContent = L + pad + ':';
+    labels[j].el.style.width = widthCh + 'ch';
+    labels[j].el.style.display = 'inline-block';
+  }
+}
+function alignAllMetricLabels() {
+  var topLabels = document.querySelectorAll('.metrics-bar-top .metric .label');
+  var bottomLabels = document.querySelectorAll('#metricsBottom .metric .label');
+  alignMetricGroup(topLabels);
+  alignMetricGroup(bottomLabels);
+}
+
+/* ===== Validation and tab logic ===== */
 function setDisabled(el, disabled){
   if (!el) return;
   el.disabled = !!disabled;
@@ -88,7 +116,7 @@ function validateFields() {
   mark(dateInput, dateOk);
   mark(distanceInput, distOk);
 
-  detailsErrors.classList.toggle('show', !ok);
+  detailsErrors && detailsErrors.classList.toggle('show', !ok);
   return ok;
 }
 function formIsValid() { return validateFields(); }
@@ -97,7 +125,7 @@ function updateTabVisibility() {
   var detailsOK = formIsValid();
   setDisabled(measureTabBtn, !detailsOK);
   setDisabled(gotoMeasureBtn, !detailsOK);
-  detailsHint.textContent = detailsOK ? 'Details complete. Proceed to Measurements.' : 'Fill all fields to unlock Measurements.';
+  if (detailsHint) detailsHint.textContent = detailsOK ? 'Details complete. Proceed to Measurements.' : 'Fill all fields to unlock Measurements.';
   setDisabled(resultsTabBtn, !resultsUnlocked);
   if (!detailsOK && (measureTabBtn.classList.contains('active') || resultsTabBtn.classList.contains('active'))) {
     showTab('detailsTab');
@@ -176,12 +204,12 @@ function updateQualityBadge(){
   }
 }
 
+/* ===== Canvas drawing ===== */
 function drawLines(lines) {
   ctx.clearRect(0,0,canvas.width,canvas.height);
   ctx.font = '16px monospace';
   ctx.fillStyle = '#000';
-  var hasIntro = (measurements.length === 0);
-  var y = hasIntro ? 12 : 0;
+  var y = 18; // Start text near the very top of the canvas
   var x = 12;
   for (var i=0;i<lines.length;i++){ ctx.fillText(lines[i], x, y); y += 22; }
 }
@@ -195,7 +223,8 @@ function renderDisplay() {
   lines.push('');
   lines.push('#   Time(s)  m/s    mph');
 
-  var shown = Math.min(8, measurements.length);
+  // Show the last 7 samples (newest-first)
+  var shown = Math.min(7, measurements.length);
   for (var i=0; i<shown; i++){
     var idx = measurements.length - 1 - i;
     var m = measurements[idx];
@@ -294,6 +323,7 @@ function renderResultsTable() {
   }
 }
 
+/* Results summary alignment (unchanged) */
 function formatAlignedLines(labelValuePairs) {
   var longest = 0;
   for (var i=0; i<labelValuePairs.length; i++) {
@@ -319,7 +349,6 @@ function renderResultsPlaceholders() {
   resultP15.textContent = lines[2];
   resultP05.textContent = lines[3];
 }
-
 function renderSummaryBox() {
   var speeds = measurements.map(function(x){ return x.speed; }).sort(function(a,b){ return a - b; });
   function pct(sorted, p){ if (!sorted.length) return NaN; var idx=(p/100)*(sorted.length-1), lo=Math.floor(idx), hi=Math.ceil(idx); if (hi>=sorted.length) return sorted[lo]; var w=idx-lo; return sorted[lo]*(1-w)+sorted[hi]*w; }
@@ -532,10 +561,11 @@ function onReady(){
   updateTabVisibility();
   updateMetricsBars();
   updateQualityBadge();
+  alignAllMetricLabels();
   showTab('detailsTab');
 }
-window.addEventListener('resize', resizeCanvas, false);
-document.addEventListener('visibilitychange', function(){ if (!document.hidden) resizeCanvas(); }, false);
+window.addEventListener('resize', function(){ resizeCanvas(); alignAllMetricLabels(); }, false);
+document.addEventListener('visibilitychange', function(){ if (!document.hidden) { resizeCanvas(); alignAllMetricLabels(); } }, false);
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', onReady, false);
 } else {
