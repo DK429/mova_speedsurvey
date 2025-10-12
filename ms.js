@@ -571,3 +571,489 @@ if (document.readyState === 'loading') {
 } else {
   onReady();
 }
+
+
+/* ===== Results Summary Alignment Helper (2025-10-12) ===== */
+(function(){
+  function formatSummaryAlignment(){
+    var ids = ["resultAvg","resultP85","resultP15","resultP05","resultMax","resultSD","resultQuality"];
+    var rows = [];
+    ids.forEach(function(id){
+      var el = document.getElementById(id);
+      if (!el) return;
+      var text = (el.textContent || "").trim();
+      var idx = text.indexOf(":");
+      var label = idx>=0 ? text.slice(0,idx).trim() : text;
+      var value = idx>=0 ? text.slice(idx+1).trim() : "";
+      rows.push([el,label,value]);
+    });
+    if (!rows.length) return;
+    var maxLen = rows.reduce(function(m, r){ return Math.max(m, r[1].length); }, 0);
+    rows.forEach(function(r){
+      var pad = Math.max(0, maxLen - r[1].length);
+      r[0].textContent = r[1] + " ".repeat(pad) + ": " + r[2];
+    });
+  }
+  if (document.readyState === "loading"){
+    document.addEventListener("DOMContentLoaded", function(){ setTimeout(formatSummaryAlignment, 0); });
+  } else {
+    setTimeout(formatSummaryAlignment, 0);
+  }
+  window.__formatSummaryAlignment = formatSummaryAlignment;
+})();
+
+
+/* ===== Extra Results Metrics + Save Enhancements (2025-10-12) ===== */
+(function(){
+  function toNumber(x){ var n = Number(x); return Number.isFinite(n) ? n : NaN; }
+  function mpsToMph(mps){ return Number.isFinite(mps) ? mps * 2.2369362921 : NaN; }
+  function mean(arr){ return arr.length ? arr.reduce((a,b)=>a+b,0) / arr.length : NaN; }
+  function sampleSD(arr){
+    var n = arr.length;
+    if (n < 2) return NaN;
+    var mu = mean(arr);
+    var v = 0;
+    for (var i=0;i<n;i++) v += Math.pow(arr[i]-mu,2);
+    v /= (n-1);
+    return Math.sqrt(v);
+  }
+  function qualityFromSpeeds(speeds){
+    // Placeholder; overridden by final quality patch below
+    var n = speeds.length;
+    if (n === 0) return {label:"—", cls:""};
+    var mu = mean(speeds);
+    var sd = sampleSD(speeds);
+    var cov = (mu>0 && Number.isFinite(sd)) ? (sd/mu) : Infinity;
+    var label = "Fair", cls = "quality-fair";
+    if (n < 5){ label = "Low"; cls = "quality-low"; }
+    else if (cov < 0.05){ label = "Very Good"; cls = "quality-vgood"; }
+    else if (cov < 0.12){ label = "Good"; cls = "quality-good"; }
+    else if (cov < 0.25){ label = "Fair"; cls = "quality-fair"; }
+    else if (cov < 0.40){ label = "Low"; cls = "quality-low"; }
+    else { label = "Poor"; cls = "quality-poor"; }
+    return {label, cls, sd, cov};
+  }
+  function fmtFixed(n, d){ return Number.isFinite(n) ? n.toFixed(d) : "—"; }
+  function fmtSpeedPair(mps){ return fmtFixed(mps,2) + " m/s | " + fmtFixed(mpsToMph(mps),2) + " mph"; }
+
+  function ensureSummarySpans(){
+    var cont = document.querySelector(".summary");
+    if (!cont) return {};
+    function need(id){
+      var el = document.getElementById(id);
+      if (!el){
+        el = document.createElement("span"); el.id = id; cont.appendChild(el);
+      }
+      return el;
+    }
+    return {
+      avg: document.getElementById("resultAvg"),
+      p85: document.getElementById("resultP85"),
+      p15: document.getElementById("resultP15"),
+      p05: document.getElementById("resultP05"),
+      max: need("resultMax"),
+      qual: need("resultQuality"),
+      sd: need("resultSD"),
+    };
+  }
+
+  function parseSpeedsFromTable(){
+    var rows = Array.from(document.querySelectorAll("#resultsTable tbody tr"));
+    var speeds = [];
+    rows.forEach(function(tr){
+      var tds = tr.querySelectorAll("td");
+      if (tds.length >= 4){
+        var mps = toNumber((tds[2].textContent || "").trim());
+        if (Number.isFinite(mps)) speeds.push(mps);
+      }
+    });
+    return speeds;
+  }
+
+  function computeAndRenderExtraSummary(){
+    var spans = ensureSummarySpans();
+    var speeds = parseSpeedsFromTable();
+    var max = speeds.length ? Math.max.apply(null, speeds) : NaN;
+    var q = qualityFromSpeeds(speeds);
+    if (spans.max) spans.max.textContent = "Max speed: " + fmtSpeedPair(max);
+    if (spans.sd) spans.sd.textContent = "Standard deviation: " + fmtFixed(q.sd, 3) + " m/s";
+    if (spans.qual) spans.qual.textContent = "Quality: " + q.label;
+
+    if (window.__formatSummaryAlignment){ window.__formatSummaryAlignment(); }
+  }
+
+  // Hook events
+  ["click"].forEach(function(evt){
+    var endBtn = document.getElementById("endSurveyBtn");
+    if (endBtn){ endBtn.addEventListener(evt, function(){ setTimeout(computeAndRenderExtraSummary, 0); }); }
+    var resBtn = document.getElementById("resultsTabBtn");
+    if (resBtn){ resBtn.addEventListener(evt, function(){ setTimeout(computeAndRenderExtraSummary, 0); }); }
+  });
+  if (document.readyState === "loading"){
+    document.addEventListener("DOMContentLoaded", function(){ setTimeout(computeAndRenderExtraSummary, 0); });
+  } else {
+    setTimeout(computeAndRenderExtraSummary, 0);
+  }
+
+  // Enhanced save
+  var saveBtnInit = function(){
+    var saveBtn = document.getElementById("saveResultsBtn");
+    if (!saveBtn) return;
+    saveBtn.addEventListener("click", function(ev){
+      try{
+        ev.preventDefault(); ev.stopImmediatePropagation();
+        // Data
+        var site = (document.getElementById("site")||{}).value || "";
+        var dist = toNumber((document.getElementById("distance")||{}).value || "");
+        var date = (document.getElementById("date")||{}).value || "";
+        var junction = (document.getElementById("junction")||{}).value || "";
+        var arm = (document.getElementById("arm")||{}).value || "";
+
+        var rows = Array.from(document.querySelectorAll("#resultsTable tbody tr"));
+        var times = [], speeds = [];
+        rows.forEach(function(tr){
+          var tds = tr.querySelectorAll("td");
+          var t = toNumber((tds[1]?.textContent||"").trim());
+          var mps = toNumber((tds[2]?.textContent||"").trim());
+          if (!Number.isFinite(mps) && Number.isFinite(t) && Number.isFinite(dist) && t>0){
+            mps = dist / t;
+          }
+          if (Number.isFinite(t)) times.push(t);
+          if (Number.isFinite(mps)) speeds.push(mps);
+        });
+
+        var maxSpd = speeds.length ? Math.max.apply(null, speeds) : NaN;
+        // temporary quality until overridden
+        var mu = mean(speeds); var sd = (function(){ var n=speeds.length;if(n<2) return NaN;var v=0;for(var i=0;i<n;i++) v+=(speeds[i]-mu)**2;return Math.sqrt(v/(n-1));})();
+        var q = qualityFromSpeeds(speeds);
+
+        var out = [];
+        out.push("MOVA SPEED SURVEY v3.2");
+        out.push("Site: " + site);
+        out.push("Junction: " + junction);
+        out.push("Arm: " + arm);
+        out.push("Date: " + date);
+        out.push("Distance (m): " + (Number.isFinite(dist) ? dist : ""));
+        out.push("Max speed: " + (Number.isFinite(maxSpd)?maxSpd.toFixed(2):"") + " m/s | " + (Number.isFinite(maxSpd)?(maxSpd*2.2369362921).toFixed(2):"") + " mph");
+        out.push("Standard deviation (m/s): " + (Number.isFinite(sd)?sd.toFixed(3):"—"));
+        out.push("Quality: " + q.label);
+        out.push("");
+        out.push("#\tTime (s)\tSpeed (m/s)\tSpeed (mph)");
+        rows.forEach(function(tr, i){
+          var tds = tr.querySelectorAll("td");
+          var t = toNumber((tds[1]?.textContent||"").trim());
+          var mps = toNumber((tds[2]?.textContent||"").trim());
+          if (!Number.isFinite(mps) && Number.isFinite(dist) && Number.isFinite(t) && t>0){
+            mps = dist / t;
+          }
+          var mph = Number.isFinite(mps) ? mps*2.2369362921 : NaN;
+          out.push((i+1) + "\t" + (Number.isFinite(t)?t.toFixed(2):"") + "\t" + (Number.isFinite(mps)?mps.toFixed(2):"") + "\t" + (Number.isFinite(mph)?mph.toFixed(2):""));
+        });
+
+        var blob = new Blob([out.join("\\n")], {type:"text/plain;charset=utf-8"});
+        var a = document.createElement("a");
+        a.download = (site || "mova_survey") + "_" + Date.now() + ".txt";
+        a.href = URL.createObjectURL(blob);
+        a.click();
+        URL.revokeObjectURL(a.href);
+      }catch(e){ console.error(e); }
+    }, true);
+  };
+  if (document.readyState === "loading"){
+    document.addEventListener("DOMContentLoaded", saveBtnInit);
+  } else {
+    saveBtnInit();
+  }
+})();
+
+
+/* ===== Bugfix: enforce single colon in metric labels (2025-10-12) ===== */
+(function(){
+  function ensureLabelColon(node){
+    if (!node) return;
+    var label = node.querySelector(".label");
+    if (!label) return;
+    var t = (label.textContent || "").trimEnd();
+    if (!t.endsWith(":")) label.textContent = t + ":";
+  }
+  function applyOnce(){
+    try{
+      document.querySelectorAll(".metrics-bar-top .metrics-row .metric").forEach(ensureLabelColon);
+      document.querySelectorAll(".metrics-bar .metric").forEach(ensureLabelColon);
+    }catch(e){}
+  }
+  if (document.readyState === "loading"){
+    document.addEventListener("DOMContentLoaded", applyOnce, {once:true});
+  } else {
+    applyOnce();
+  }
+})();
+
+
+/* ===== Quality Classification Fix (bias down one level) (2025-10-12) ===== */
+(function(){
+  const QUALITY_LEVELS = [
+    { label: "Poor",       cls: "quality-poor"  },
+    { label: "Low",        cls: "quality-low"   },
+    { label: "Fair",       cls: "quality-fair"  },
+    { label: "Good",       cls: "quality-good"  },
+    { label: "Very Good",  cls: "quality-vgood" }
+  ];
+  function covFromArray(arr){
+    var n = arr.length;
+    if (n === 0) return Infinity;
+    var mu = arr.reduce((a,b)=>a+b,0) / n;
+    if (!(mu > 0)) return Infinity;
+    var v = 0;
+    for (var i=0;i<n;i++) v += Math.pow(arr[i]-mu,2);
+    var sd = Math.sqrt(v / Math.max(1, n - 1));
+    return sd / mu;
+  }
+  function baseQualityIndex(n, cov){
+    if (!Number.isFinite(cov)) return 0;
+    if (n < 5)               return 1;
+    if (cov < 0.050)         return 4;
+    if (cov < 0.120)         return 3;
+    if (cov < 0.250)         return 2;
+    if (cov < 0.400)         return 1;
+    return 0;
+  }
+  function biasedDownIndex(idx){ return Math.max(0, idx - 1); }
+
+  // Override/define global helpers expected by existing code
+  window.qualityLabelFromSamples = function(samples){
+    var n = samples.length;
+    var cov = covFromArray(samples);
+    var idx = biasedDownIndex(baseQualityIndex(n, cov));
+    return { label: QUALITY_LEVELS[idx].label, cls: QUALITY_LEVELS[idx].cls };
+  };
+  window.qualityFromSpeeds = function(speeds){
+    var n = speeds.length;
+    var cov = covFromArray(speeds);
+    var idx = biasedDownIndex(baseQualityIndex(n, cov));
+    var mu = speeds.length ? speeds.reduce((a,b)=>a+b,0) / speeds.length : NaN;
+    var sd = NaN;
+    if (speeds.length >= 2){
+      var v = 0;
+      for (var i=0;i<speeds.length;i++) v += Math.pow(speeds[i]-mu,2);
+      sd = Math.sqrt(v / (speeds.length - 1));
+    }
+    return { label: QUALITY_LEVELS[idx].label, cls: QUALITY_LEVELS[idx].cls, sd: sd, cov: cov };
+  };
+})();
+
+
+/* ===== Patch (2025-10-12): normalize value columns widths for m/s and mph ===== */
+(function(){
+  function normalizeValuePair(val){
+    // Expect like: "<num> m/s | <num> mph"
+    var m = val.match(/([+-]?\d+(?:\.\d+)?)\s*m\/s\s*\|\s*([+-]?\d+(?:\.\d+)?)\s*mph/i);
+    if (!m) return val;
+    var mps = Number(m[1]), mph = Number(m[2]);
+    if (!Number.isFinite(mps) || !Number.isFinite(mph)) return val;
+    var mpsStr = mps.toFixed(2).padStart(6, " ");
+    var mphStr = mph.toFixed(2).padStart(6, " ");
+    return mpsStr + " m/s | " + mphStr + " mph";
+  }
+
+  window.__formatSummaryAlignment = function(){
+    var ids = ["resultAvg","resultP85","resultP15","resultP05","resultMax","resultSD","resultQuality"];
+    var rows = [];
+    ids.forEach(function(id){
+      var el = document.getElementById(id);
+      if (!el) return;
+      var text = (el.textContent || "").trim();
+      var idx = text.indexOf(":");
+      var label = idx>=0 ? text.slice(0,idx).trim() : text;
+      var value = idx>=0 ? text.slice(idx+1).trim() : "";
+      // normalize value pair if present
+      value = normalizeValuePair(value);
+      rows.push([el,label,value]);
+    });
+    if (!rows.length) return;
+    var maxLen = rows.reduce(function(m, r){ return Math.max(m, r[1].length); }, 0);
+    rows.forEach(function(r){
+      var pad = Math.max(0, maxLen - r[1].length);
+      r[0].textContent = r[1] + " ".repeat(pad) + ": " + r[2];
+    });
+  };
+
+  // Re-run alignment on load and when tab shows
+  if (document.readyState === "loading"){
+    document.addEventListener("DOMContentLoaded", function(){ setTimeout(window.__formatSummaryAlignment, 0); });
+  } else {
+    setTimeout(window.__formatSummaryAlignment, 0);
+  }
+  var resBtn = document.getElementById("resultsTabBtn");
+  if (resBtn){ resBtn.addEventListener("click", function(){ setTimeout(window.__formatSummaryAlignment, 0); }); }
+})();
+
+
+/* ===== Patch (2025-10-12): Final Results Quality — require >=10 samples for above "Poor" ===== */
+(function(){
+  function covFromArray(arr){
+    var n = arr.length;
+    if (n === 0) return Infinity;
+    var mu = arr.reduce((a,b)=>a+b,0) / n;
+    if (!(mu > 0)) return Infinity;
+    var v = 0;
+    for (var i=0;i<n;i++) v += Math.pow(arr[i]-mu,2);
+    var sd = Math.sqrt(v / Math.max(1, n - 1));
+    return sd / mu;
+  }
+  var LEVELS = [
+    { label: "Poor", cls: "quality-poor" },
+    { label: "Low", cls: "quality-low" },
+    { label: "Fair", cls: "quality-fair" },
+    { label: "Good", cls: "quality-good" },
+    { label: "Very Good", cls: "quality-vgood" },
+  ];
+  function baseIdx(n, cov){
+    if (!Number.isFinite(cov)) return 0;
+    if (n < 5) return 1;
+    if (cov < 0.050) return 4;
+    if (cov < 0.120) return 3;
+    if (cov < 0.250) return 2;
+    if (cov < 0.400) return 1;
+    return 0;
+  }
+  function biasedDown(i){ return Math.max(0, i - 1); }
+
+  // Final results rule: if n < 10 => Poor, otherwise biased thresholds
+  function classifyFinal(speeds){
+    var n = speeds.length;
+    if (n < 10) return LEVELS[0];
+    var cov = covFromArray(speeds);
+    var idx = biasedDown(baseIdx(n, cov));
+    return LEVELS[idx];
+  }
+
+  // Hook into extra summary + save pipeline by overriding qualityFromSpeeds used there
+  var oldQualityFromSpeeds = window.qualityFromSpeeds;
+  window.qualityFromSpeeds = function(speeds){
+    var res = classifyFinal(speeds);
+    // keep sd/cov if old available
+    var q = { label: res.label, cls: res.cls };
+    if (Array.isArray(speeds) && speeds.length >= 2){
+      var n = speeds.length;
+      var mu = speeds.reduce((a,b)=>a+b,0) / n;
+      var v = 0; for (var i=0;i<n;i++) v += Math.pow(speeds[i]-mu,2);
+      q.sd = Math.sqrt(v / (n-1));
+      q.cov = (mu>0) ? q.sd / mu : Infinity;
+    }
+    return q;
+  };
+})();
+
+
+/* ===== Unified Quality (sample-count thresholds) 2025-10-12 ===== */
+(function(){
+  function qualityLevelFromCount(n){
+    if (n >= 100) return { label: "Very Good", cls: "quality-vgood" };
+    if (n >= 75)  return { label: "Good",      cls: "quality-good" };
+    if (n >= 50)  return { label: "Fair",      cls: "quality-fair" };
+    if (n >= 25)  return { label: "Low",       cls: "quality-low" };
+    return { label: "Poor",                     cls: "quality-poor" };
+  }
+
+  // Override any previous quality helpers to use count-based thresholds everywhere
+  window.qualityLabelFromSamples = function(samples){
+    var n = Array.isArray(samples) ? samples.length : 0;
+    return qualityLevelFromCount(n);
+  };
+
+  // Results summary helper (used by extra metrics/save) aligned to the same rule
+  window.qualityFromSpeeds = function(speeds){
+    var n = Array.isArray(speeds) ? speeds.length : 0;
+    var q = qualityLevelFromCount(n);
+    // Keep sd/cov if any upstream expects them (compute sd only if needed elsewhere)
+    // Not required for classification now, but harmless to include NaN.
+    q.sd = Number.NaN;
+    q.cov = Number.NaN;
+    return q;
+  };
+
+  // Also patch the inline Quality chip in Measurements tab if it was computed differently
+  function patchQualityChip(){
+    var chip = document.getElementById("qualityInline");
+    if (!chip) return;
+    // Remove any previous quality-* classes, then apply the unified one
+    ["quality-poor","quality-low","quality-fair","quality-good","quality-vgood"].forEach(function(c){
+      chip.classList.remove(c);
+    });
+    // Count samples from the bottom metrics or state inferred from table
+    var rows = document.querySelectorAll("#resultsTable tbody tr");
+    var n = 0;
+    if (rows && rows.length){
+      n = rows.length;
+    } else {
+      // Fallback: try to read the 'Samples' metric on the top bar if present
+      var countEl = document.getElementById("countMetric");
+      if (countEl){
+        var v = parseInt((countEl.textContent||"").trim(), 10);
+        n = isFinite(v) ? v : 0;
+      }
+    }
+    var q = qualityLevelFromCount(n);
+    chip.classList.add(q.cls);
+    chip.textContent = "Quality: " + q.label;
+  }
+
+  // Try to keep chip in sync
+  document.addEventListener("DOMContentLoaded", function(){
+    setTimeout(patchQualityChip, 0);
+  });
+  ["click","input"].forEach(function(evt){
+    document.addEventListener(evt, function(){
+      setTimeout(patchQualityChip, 0);
+    }, true);
+  });
+})();
+
+
+/* === FINAL unified quality: ALWAYS use sample count everywhere (v3.2) === */
+(function(){
+  function qualityLevelFromCount(n){
+    if (n >= 100) return { label: "Very Good", cls: "quality-vgood" };
+    if (n >= 75)  return { label: "Good",      cls: "quality-good"  };
+    if (n >= 50)  return { label: "Fair",      cls: "quality-fair"  };
+    if (n >= 25)  return { label: "Low",       cls: "quality-low"   };
+    return { label: "Poor",                    cls: "quality-poor"  };
+  }
+  function getSampleCount(){
+    const countEl = document.getElementById("countMetric");
+    const v = parseInt((countEl?.textContent || "").trim(), 10);
+    if (Number.isFinite(v) && v >= 0) return v;
+    return document.querySelectorAll("#resultsTable tbody tr").length;
+  }
+  window.qualityLabelFromSamples = function(_samples){
+    return qualityLevelFromCount(getSampleCount());
+  };
+  window.qualityFromSpeeds = function(_speeds){
+    const q = qualityLevelFromCount(getSampleCount());
+    q.sd = Number.NaN; q.cov = Number.NaN;
+    return q;
+  };
+  function updateResultsQualityLine(){
+    const el = document.getElementById("resultQuality");
+    if (!el) return;
+    const q = qualityLevelFromCount(getSampleCount());
+    el.textContent = "Quality: " + q.label;
+    if (typeof window.__formatSummaryAlignment === "function"){
+      setTimeout(window.__formatSummaryAlignment, 0);
+    }
+  }
+  function updateChip(){
+    const chip = document.getElementById("qualityInline");
+    if (!chip) return;
+    const q = qualityLevelFromCount(getSampleCount());
+    ["quality-poor","quality-low","quality-fair","quality-good","quality-vgood"]
+      .forEach(c => chip.classList.remove(c));
+    chip.classList.add(q.cls);
+    chip.textContent = "Quality: " + q.label;
+  }
+  function syncAll(){ updateResultsQualityLine(); updateChip(); }
+  document.addEventListener("DOMContentLoaded", () => setTimeout(syncAll, 0));
+  ["click","input"].forEach(evt => document.addEventListener(evt, () => setTimeout(syncAll, 0), true));
+  setTimeout(syncAll, 0);
+})();
