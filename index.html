@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MOVA SPEED SURVEY v3</title>
+  <title>MOVA SPEED SURVEY v3.1</title>
   <link rel="stylesheet" href="ms.css">
 </head>
 <body>
-  <h2>MOVA SPEED SURVEY v3</h2>
+  <h2>MOVA SPEED SURVEY v3.1</h2>
 
   <div class="tabs">
     <button class="tab-btn active" data-tab="detailsTab" id="detailsTabBtn" type="button">1. Junction Details</button>
@@ -52,11 +52,11 @@
 
       <div class="metrics-bar-top" aria-live="polite">
         <div class="metrics-row metrics-row--top">
-          <div class="metric"><span class="label">Samples:</span><span class="value" id="countMetric">0</span></div>
+          <div class="metric"><span class="label">Samples</span><span class="value" id="countMetric">0</span></div>
           <span id="qualityInline" class="quality-chip">Quality: —</span>
         </div>
         <div class="metrics-row">
-          <div class="metric"><span class="label">Timer:</span><span class="value" id="timerMetric">0.00 s</span></div>
+          <div class="metric"><span class="label">Timer</span><span class="value" id="timerMetric">0.00 s</span></div>
         </div>
       </div>
 
@@ -71,8 +71,8 @@
       </div>
 
       <div class="metrics-bar" id="metricsBottom" aria-live="polite" style="border-bottom:none;">
-        <div class="metric"><span class="label">Avg Spd:</span><span class="value" id="avgMetric">— m/s | — mph</span></div>
-        <div class="metric"><span class="label">85%:</span><span class="value" id="p85Metric">— m/s | — mph</span></div>
+        <div class="metric"><span class="label">Avg Spd</span><span class="value" id="avgMetric">— m/s | — mph</span></div>
+        <div class="metric"><span class="label">85%</span><span class="value" id="p85Metric">— m/s | — mph</span></div>
       </div>
     </fieldset>
     <p class="helper one-line">Click End Survey to see results.</p>
@@ -83,11 +83,11 @@
 
   <div id="resultsTab" class="tab-content hidden" aria-hidden="true">
     <div class="summary">
-<h3>Results Summary</h3>
-<span id="resultAvg"></span>
-<span id="resultP85"></span>
-<span id="resultP15"></span>
-<span id="resultP05"></span>
+      <h3>Results Summary</h3>
+      <span id="resultAvg"></span>
+      <span id="resultP85"></span>
+      <span id="resultP15"></span>
+      <span id="resultP05"></span>
     </div>
 
     <table id="resultsTable" class="results-fixed">
