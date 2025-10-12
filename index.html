@@ -581,10 +581,10 @@ function renderSummaryBox() {
   var p85 = pct(speeds, 85);
   var p15 = pct(speeds, 15);
   var p05 = pct(speeds, 5);
-  resultAvg.textContent = 'Average Speed     : ' + fmtMetric(avg);
-  resultP85.textContent = '85th Percentile   : ' + fmtMetric(p85);
-  resultP15.textContent = '15th Percentile   : ' + fmtMetric(p15);
-  resultP05.textContent = '5th Percentile    : ' + fmtMetric(p05);
+  resultAvg.textContent = 'Avg Speed  : ' + fmtMetric(avg);
+  resultP85.textContent = '85th %tile : ' + fmtMetric(p85);
+  resultP15.textContent = '15th %tile : ' + fmtMetric(p15);
+  resultP05.textContent = '5th  %tile : ' + fmtMetric(p05);
 }
 
 /* ====== Save TXT (aligned) ====== */
@@ -735,10 +735,10 @@ function clearAllAndReset() {
   resultsUnlocked = false;
   // Reset metrics and results text
   timerMetric.textContent = '0.00 s';
-  resultAvg.textContent = 'Average Speed     : — m/s | — mph';
-  resultP85.textContent = '85th Percentile   : — m/s | — mph';
-  resultP15.textContent = '15th Percentile   : — m/s | — mph';
-  resultP05.textContent = '5th Percentile    : — m/s | — mph';
+  resultAvg.textContent = 'Avg Speed  : — m/s | — mph';
+  resultP85.textContent = '85th %tile : — m/s | — mph';
+  resultP15.textContent = '15th %tile : — m/s | — mph';
+  resultP05.textContent = '5th  %tile : — m/s | — mph';
   renderResultsTable();
   renderDisplay();
   updateEndSurveyColor();
