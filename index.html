@@ -3,20 +3,35 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MOVA SPEED SURVEY (Mobile Optimised)</title>
+<title>MOVA SPEED SURVEY</title>
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
 nav { display: flex; width: 100%; background: #eee; }
-nav button { flex: 1; padding: 10px; font-size: 16px; border: none; cursor: pointer; background: #ddd; }
-nav button.active { background: #aaa; color: #fff; }
+nav button { flex: 1; padding: 12px; font-size: 18px; border: none; cursor: pointer; background: #ddd; }
+nav button.active { background: #555; color: #fff; }
 .tab { display: none; padding: 16px; }
 .tab.active { display: block; }
 
-/* Canvas and metrics */
-#canvas { border: 2px solid #333; background: #fff; display: block; margin: 10px auto; width: 100%; max-width: 480px; height: 240px; }
+/* Canvas */
+#canvas { 
+  border: 2px solid #333; 
+  background: #fff; 
+  display: block; 
+  margin: 10px auto; 
+  width: 100%; 
+  max-width: 480px; 
+  height: 240px; /* increased height */
+}
+
+/* Metrics */
 .metrics-bar-top, .metrics-bar-bottom {
-  display: flex; justify-content: space-between; align-items: center;
-  max-width: 480px; margin: 0 auto; font-size: 14px; font-family: monospace;
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center; 
+  max-width: 480px; 
+  margin: 0 auto; 
+  font-size: 14px; 
+  font-family: monospace;
 }
 .metrics-bar-bottom { margin-top: 8px; }
 .metrics-label { display: inline-block; width: 8ch; text-align: left; }
@@ -28,7 +43,6 @@ nav button.active { background: #aaa; color: #fff; }
 /* Mobile adjustments */
 @media (max-width: 480px) {
   nav button { padding: 8px; font-size: 14px; }
-  #canvas { height: 220px; }
 }
 </style>
 </head>
@@ -40,7 +54,7 @@ nav button.active { background: #aaa; color: #fff; }
   <button id="tabResultsBtn" onclick="showTab('results')">Results</button>
 </nav>
 
-<!-- TAB 1: Junction Details -->
+<!-- TAB 1 -->
 <div id="details" class="tab active">
   <h2>Junction Details</h2>
   <label>Site: <input type="text" id="site"></label><br>
@@ -51,20 +65,17 @@ nav button.active { background: #aaa; color: #fff; }
   <button onclick="goToMeasurements()">Go to Measurements ▶</button>
 </div>
 
-<!-- TAB 2: Measurements -->
+<!-- TAB 2 -->
 <div id="measure" class="tab">
   <h2>Measurements</h2>
 
-  <!-- Top metrics bar -->
   <div class="metrics-bar-top">
     <div>Samples: <span id="sampleCount">0</span></div>
     <div id="qualityBadge">Quality: Poor</div>
   </div>
 
-  <!-- Canvas -->
   <canvas id="canvas"></canvas>
 
-  <!-- Bottom metrics -->
   <div class="metrics-bar-bottom">
     <div><span class="metrics-label">Avg Spd:</span> <span id="avgSpeed" class="metrics-value">-- m/s | -- mph</span></div>
     <div><span class="metrics-label">85%:</span> <span id="p85" class="metrics-value">-- m/s | -- mph</span></div>
@@ -75,20 +86,18 @@ nav button.active { background: #aaa; color: #fff; }
   <button onclick="endSurvey()">End Survey</button>
 </div>
 
-<!-- TAB 3: Results -->
+<!-- TAB 3 -->
 <div id="results" class="tab">
   <h2>Results</h2>
   <pre id="resultsSummary">No results yet.</pre>
 </div>
 
 <script>
-// === State ===
 let measurements = [];
 let measuring = false;
 let startTime = 0;
-let rafId;
 
-// === Tab switching ===
+// === Tabs ===
 function showTab(id) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
@@ -96,12 +105,9 @@ function showTab(id) {
   document.getElementById("tab" + id.charAt(0).toUpperCase() + id.slice(1) + "Btn").classList.add("active");
 }
 
-function goToMeasurements() {
-  showTab('measure');
-  drawCanvas();
-}
+function goToMeasurements() { showTab('measure'); drawCanvas(); }
 
-// === Measurement logic ===
+// === Measurement ===
 function toggleMeasurement() {
   if (!measuring) {
     measuring = true;
@@ -119,16 +125,8 @@ function toggleMeasurement() {
   }
 }
 
-function deleteLast() {
-  measurements.pop();
-  updateStats();
-  drawCanvas();
-}
-
-function endSurvey() {
-  showTab('results');
-  generateResults();
-}
+function deleteLast() { measurements.pop(); updateStats(); drawCanvas(); }
+function endSurvey() { showTab('results'); generateResults(); }
 
 // === Stats ===
 function updateStats() {
@@ -152,31 +150,26 @@ function updateStats() {
   }
 }
 
-// === Canvas rendering ===
+// === Canvas ===
 function drawCanvas() {
   const c = document.getElementById('canvas');
   const ctx = c.getContext('2d');
-  c.width = c.clientWidth; // Auto-fit width
+  c.width = c.clientWidth;
   c.height = c.clientHeight;
   ctx.clearRect(0, 0, c.width, c.height);
   ctx.font = "14px monospace";
   ctx.fillStyle = "#000";
 
-  const startY = 30;
-  const lineHeight = 20;
-  ctx.fillText("#   Time(s)   m/s     mph", 10, startY);
+  ctx.fillText("#   Time(s)   m/s     mph", 10, 30);
 
   const reversed = [...measurements].reverse().slice(0, 6); // newest first
   reversed.forEach((m, i) => {
     const line = `${String(measurements.length - i).padEnd(4)}${m.time.toFixed(2).padEnd(10)}${m.speed.toFixed(2).padEnd(8)}${m.mph.toFixed(2)}`;
-    ctx.fillText(line, 10, startY + lineHeight * (i + 1));
+    ctx.fillText(line, 10, 50 + 20 * i);
   });
 }
 
-function tick() {
-  if (measuring) requestAnimationFrame(tick);
-  drawCanvas();
-}
+function tick() { if (measuring) requestAnimationFrame(tick); drawCanvas(); }
 
 // === Results ===
 function generateResults() {
