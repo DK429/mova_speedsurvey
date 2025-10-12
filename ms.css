@@ -124,3 +124,20 @@ table.results-fixed th:first-child, table.results-fixed td:first-child { text-al
   :root{ --tab-font: 16px; --tab-pad-v: 10px; --tab-pad-h: 10px; --btn-font: 19px; }
   .metric .label { min-width: 96px; }
 }
+
+
+/* ===== Final Overrides (2025-10-12) ===== */
+/* Measurements: remove pseudo-colons to avoid duplication and keep tight gaps */
+.metrics-bar-top .metric,
+.metrics-bar .metric { gap: 6px !important; }
+.metrics-bar-top .metric .label::after,
+.metrics-bar .metric .label::after { content: "" !important; }
+
+/* Remove borders on tab buttons and the Measurements tab content panel */
+.tabs .tab-btn { border: none !important; }
+.tab-btn + .tab-btn { border-left-width: 0; }
+#measureTab { border: none !important; }
+
+/* Results summary alignment: monospace spans aligned by JS, consecutive lines (no extra spacing) */
+.summary { white-space: normal !important; }
+.summary span { font-family: monospace; white-space: pre !important; display: block; margin: 0 !important; }
