@@ -3,9 +3,8 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>MOVA SPEED SURVEY</title>
+<title>MOVA SPEED SURVEY v3</title>
 <style>
-  /* ====== Base look & feel (bigger tap targets like the original) ====== */
   :root{
     --max-form-width: 560px;
     --tab-font: 18px;
@@ -17,15 +16,11 @@
     --input-font: 18px;
     --input-pad-v: 10px;
     --input-pad-h: 12px;
-
-    /* New : metrics font (# +1pt) */
     --metrics-font: 16px;
   }
-
   body { font-family: Arial, sans-serif; margin: 18px; color:#111; }
   h2 { text-align:center; margin: 6px 0 14px; font-size: 24px; }
 
-  /* ====== Tabs (full width, big tap targets) ====== */
   .tabs { display: flex; width: 100%; margin: 0 0 12px 0; }
   .tab-btn {
     flex: 1 1 0;
@@ -49,18 +44,13 @@
   }
   .hidden { display:none; }
 
-  /* ====== Form ====== */
   fieldset { border:1px solid #999; padding: 12px 14px; margin-bottom:12px;
              max-width: var(--max-form-width); margin-left:auto; margin-right:auto; text-align:left; }
   legend { font-weight:bold; font-size: 18px; }
   label { display:inline-block; min-width: 170px; font-size: var(--input-font); }
-  input, button {
-    margin: 6px;
-    padding: var(--input-pad-v) var(--input-pad-h);
-    font-size: var(--input-font);
-  }
+  input, button { margin: 6px; padding: var(--input-pad-v) var(--input-pad-h); font-size: var(--input-font); }
   input[type="text"], input[type="date"], input[type="number"] {
-    width: calc(100% - 210px); /* label min-width (170) + margins/padding approx */
+    width: calc(100% - 210px);
     max-width: 340px;
   }
   @media (max-width: 560px){
@@ -73,7 +63,6 @@
   .helper { text-align:center; color:#444; margin: 8px 0; font-size: 15px; }
   .helper.one-line { white-space: nowrap; }
 
-  /* ====== Buttons (big & comfy) ====== */
   #measureBtn, #deleteLastBtn, #endSurveyBtn, #saveResultsBtn, #clearDataBtn, #gotoMeasureBtn {
     font-size: var(--btn-font);
     padding: var(--btn-pad-v) var(--btn-pad-h);
@@ -86,47 +75,43 @@
   button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   body, button, input { -webkit-user-select: none; user-select: none; }
 
-  /* ====== Metrics bars (static) ====== */
   .metrics-bar-top, .metrics-bar {
     max-width: var(--max-form-width);
     margin: 6px auto;
     padding: 8px 10px;
     display: flex;
-    flex-direction: column; /* stack for narrow screens */
+    flex-direction: column;
     gap: 8px;
     font-family: monospace;
+    font-size: var(--metrics-font);
     border-bottom: 1px solid #ddd;
   }
   .metrics-row { display: flex; gap: 24px; align-items: baseline; }
+  .metrics-row--top { justify-content: space-between; align-items: center; }
   .metric { display:flex; gap: 10px; }
   .metric .label { font-weight:700; min-width: 110px; }
   .metric .value { white-space: pre; text-align:left; }
 
-  /* ====== Canvas (responsive) ====== */
-  .canvas-wrap { position: relative; width: 100%; max-width: var(--max-form-width); margin: 6px auto 10px; }
-  canvas { border: 2px solid #333; background: #fff; display: block; margin: 0 auto 8px auto; width: 100%; height: auto; }
-  /* base logical size; will be scaled to container width */
-  #canvas { width: 100%; max-width: var(--max-form-width); }
-  /* We’ll compute height ratio in JS; base H=240 for readability */
-  
-  /* Quality badge at top-left */
-  .quality-badge {
-    position: absolute;
-    top: 8px; left: 8px;
+  .quality-chip {
     padding: 6px 10px;
     border-radius: 14px;
     font-family: monospace;
-    font-size: 14px;
+    font-size: var(--metrics-font);
     border: 1px solid rgba(0,0,0,0.15);
     background: #eee; color: #222;
-    pointer-events: none; user-select: none; z-index: 1;
+    white-space: nowrap;
+    transition: background-color 240ms ease, color 240ms ease, border-color 240ms ease;
   }
   .quality-poor  { background:#ffe5e5; color:#8a0000; }
   .quality-low   { background:#fff3cd; color:#7a5a00; }
   .quality-fair  { background:#e3f2fd; color:#0b5394; }
   .quality-good  { background:#e6ffed; color:#0b6b2a; }
+  .quality-vgood { background:#c8f7c5; color:#085a14; font-weight: bold; }
 
-  /* ====== Results table (aligned with export) ====== */
+  .canvas-wrap { position: relative; width: 100%; max-width: var(--max-form-width); margin: 6px auto 10px; }
+  canvas { border: 2px solid #333; background: #fff; display: block; margin: 0 auto 8px auto; width: 100%; height: auto; }
+  #canvas { width: 100%; max-width: var(--max-form-width); }
+
   table.results-fixed {
     border-collapse: collapse;
     width: fit-content;
@@ -142,7 +127,6 @@
   .summary { max-width: var(--max-form-width); margin: 10px auto; font-family: monospace; white-space: pre; font-size: 15px; }
   .summary h3 { margin: 6px 0 8px; font-family: Arial, sans-serif; font-weight: bold; white-space: normal; font-size: 18px; }
 
-  /* Mobile refinements */
   @media (max-width: 420px){
     :root{ --tab-font: 16px; --tab-pad-v: 10px; --tab-pad-h: 10px; --btn-font: 19px; }
     .metric .label { min-width: 96px; }
@@ -150,16 +134,14 @@
 </style>
 </head>
 <body>
-  <h2>MOVA SPEED SURVEY</h2>
+  <h2>MOVA SPEED SURVEY v3</h2>
 
-  <!-- TABS -->
   <div class="tabs">
     <button class="tab-btn active" data-tab="detailsTab" id="detailsTabBtn" type="button">1. Junction Details</button>
     <button class="tab-btn" data-tab="measureTab" id="measureTabBtn" type="button" disabled aria-disabled="true" title="Complete Junction Details first">2. Measurements</button>
     <button class="tab-btn" data-tab="resultsTab" id="resultsTabBtn" type="button" disabled aria-disabled="true" title="Press End Survey to view results">3. Results</button>
   </div>
 
-  <!-- TAB 1: DETAILS -->
   <div id="detailsTab" class="tab-content">
     <fieldset>
       <legend>Junction Details</legend>
@@ -191,15 +173,14 @@
     </div>
   </div>
 
-  <!-- TAB 2: MEASUREMENTS -->
   <div id="measureTab" class="tab-content hidden" aria-hidden="true">
     <fieldset>
       <legend>Measurement</legend>
 
-      <!-- Top metrics: Samples + Timer -->
       <div class="metrics-bar-top" aria-live="polite">
-        <div class="metrics-row">
+        <div class="metrics-row metrics-row--top">
           <div class="metric"><span class="label">Samples:</span><span class="value" id="countMetric">0</span></div>
+          <span id="qualityInline" class="quality-chip">Quality: —</span>
         </div>
         <div class="metrics-row">
           <div class="metric"><span class="label">Timer:</span><span class="value" id="timerMetric">0.00 s</span></div>
@@ -207,9 +188,7 @@
       </div>
 
       <div class="canvas-wrap" id="canvasWrap">
-        <!-- base size (scaled to container width) -->
         <canvas id="canvas" width="460" height="240"></canvas>
-        <span id="qualityBadge" class="quality-badge">Quality: —</span>
       </div>
 
       <div style="text-align:center; margin-top: 6px;">
@@ -218,7 +197,6 @@
         <button id="deleteLastBtn" type="button">Delete Last Sample</button>
       </div>
 
-      <!-- Bottom metrics (compact labels; aligned values) -->
       <div class="metrics-bar" id="metricsBottom" aria-live="polite" style="border-bottom:none;">
         <div class="metric"><span class="label">Avg Spd:</span><span class="value" id="avgMetric">— m/s | — mph</span></div>
         <div class="metric"><span class="label">85%:</span><span class="value" id="p85Metric">— m/s | — mph</span></div>
@@ -230,31 +208,21 @@
     </div>
   </div>
 
-  <!-- TAB 3: RESULTS -->
   <div id="resultsTab" class="tab-content hidden" aria-hidden="true">
     <div class="summary">
 <h3>Results Summary</h3>
-<span id="resultAvg">Avrg Speed : — m/s | — mph</span>
-<span id="resultP85">85th %tile : — m/s | — mph</span>
-<span id="resultP15">15th %tile : — m/s | — mph</span>
-<span id="resultP05">5th  %tile : — m/s | — mph</span>
+<span id="resultAvg"></span>
+<span id="resultP85"></span>
+<span id="resultP15"></span>
+<span id="resultP05"></span>
     </div>
 
-    <!-- Fixed-width results table -->
     <table id="resultsTable" class="results-fixed">
       <colgroup>
-        <col style="width:5ch;">
-        <col style="width:10ch;">
-        <col style="width:12ch;">
-        <col style="width:12ch;">
+        <col style="width:5ch;"><col style="width:10ch;"><col style="width:12ch;"><col style="width:12ch;">
       </colgroup>
       <thead>
-        <tr>
-          <th>#</th>
-          <th>Time (s)</th>
-          <th>Speed (m/s)</th>
-          <th>Speed (mph)</th>
-        </tr>
+        <tr><th>#</th><th>Time (s)</th><th>Speed (m/s)</th><th>Speed (mph)</th></tr>
       </thead>
       <tbody></tbody>
     </table>
@@ -266,7 +234,6 @@
   </div>
 
 <script>
-/* ====== Polyfills ====== */
 (function(){
   if (!window.requestAnimationFrame) {
     window.requestAnimationFrame = function(cb){ return setTimeout(function(){ cb(Date.now()); }, 16); };
@@ -279,7 +246,6 @@ function nowMs(){ return (window.performance && performance.now) ? performance.n
 function padRight(str, len){ str = String(str); while (str.length < len) str += ' '; return str; }
 function padLeft(str, len){ str = String(str); if (str.length >= len) return str; return Array(len - str.length + 1).join(' ') + str; }
 
-/* ====== Elements ====== */
 var canvas = document.getElementById('canvas');
 var ctx = canvas.getContext('2d');
 var canvasWrap = document.getElementById('canvasWrap');
@@ -305,7 +271,6 @@ var resultsTab = document.getElementById('resultsTab');
 var gotoMeasureBtn = document.getElementById('gotoMeasureBtn');
 var resultsTbody = document.querySelector('#resultsTable tbody');
 
-/* Results summary elements */
 var resultAvg = document.getElementById('resultAvg');
 var resultP85 = document.getElementById('resultP85');
 var resultP15 = document.getElementById('resultP15');
@@ -318,16 +283,13 @@ var avgMetric = document.getElementById('avgMetric');
 var p85Metric = document.getElementById('p85Metric');
 var countMetric = document.getElementById('countMetric');
 var timerMetric = document.getElementById('timerMetric');
-var qualityBadge = document.getElementById('qualityBadge');
 
-/* ====== State ====== */
 var measuring = false;
 var startTime = 0;
 var rafId = null;
-var measurements = []; // {distance, time, speed, mph}
+var measurements = [];
 var resultsUnlocked = false;
 
-/* ====== Utils ====== */
 function setDisabled(el, disabled){
   if (!el) return;
   el.disabled = !!disabled;
@@ -343,7 +305,6 @@ function addRobustTap(el, handler){
 }
 function sanitizeSite(value) { return String(value || '').replace(/[^A-Za-z0-9]/g, '').slice(0,7); }
 
-/* ====== Validation ====== */
 function validateFields() {
   var ok = true;
   function mark(el, cond) {
@@ -368,7 +329,6 @@ function validateFields() {
 }
 function formIsValid() { return validateFields(); }
 
-/* ====== Gating & Tabs ====== */
 function updateTabVisibility() {
   var detailsOK = formIsValid();
   setDisabled(measureTabBtn, !detailsOK);
@@ -390,7 +350,7 @@ function showTab(tab) {
     tab = 'detailsTab';
   }
   if (tab === 'resultsTab' && !resultsUnlocked) {
-    alert('Press "End Survey" to view results.');
+    alert('Press \"End Survey\" to view results.');
     tab = 'measureTab';
   }
   detailsTab.classList.add('hidden'); detailsTab.setAttribute('aria-hidden','true');
@@ -414,13 +374,11 @@ function showTab(tab) {
   }
 }
 
-/* Robust taps for tabs/buttons */
 addRobustTap(detailsTabBtn, function(){ showTab('detailsTab'); });
 addRobustTap(measureTabBtn, function(){ updateTabVisibility(); showTab('measureTab'); });
 addRobustTap(resultsTabBtn, function(){ updateTabVisibility(); showTab('resultsTab'); });
 addRobustTap(gotoMeasureBtn, function(){ updateTabVisibility(); showTab('measureTab'); });
 
-/* ====== Canvas: responsive size ====== */
 var BASE_W = 460, BASE_H = 240, BASE_RATIO = BASE_H / BASE_W;
 function resizeCanvas(){
   if (!canvas || !canvasWrap) return;
@@ -438,26 +396,28 @@ function resizeCanvas(){
   renderDisplay();
 }
 
-/* ====== Quality badge ====== */
-function getQuality(n){
-  if (n > 100) return {label:'Good', cls:'quality-good'};
-  if (n >= 50)  return {label:'Fair', cls:'quality-fair'};
-  if (n >= 25)  return {label:'Low',  cls:'quality-low'};
-  return {label:'Poor', cls:'quality-poor'};
+function getQuality(n) {
+  if (n >= 100) return { label: 'V.Good', cls: 'quality-vgood' };
+  if (n >= 75)  return { label: 'Good',   cls: 'quality-good'  };
+  if (n >= 50)  return { label: 'Fair',   cls: 'quality-fair'  };
+  if (n >= 25)  return { label: 'Low',    cls: 'quality-low'   };
+  return { label: 'Poor',  cls: 'quality-poor' };
 }
 function updateQualityBadge(){
   var q = getQuality(measurements.length);
-  qualityBadge.textContent = 'Quality: ' + q.label;
-  qualityBadge.className = 'quality-badge ' + q.cls;
+  var inline = document.getElementById('qualityInline');
+  if (inline) {
+    inline.textContent = 'Quality: ' + q.label;
+    inline.className = 'quality-chip ' + q.cls;
+  }
 }
 
-/* ====== Canvas rendering (newest first) ====== */
 function drawLines(lines) {
   ctx.clearRect(0,0,canvas.width,canvas.height);
   ctx.font = '16px monospace';
   ctx.fillStyle = '#000';
   var hasIntro = (measurements.length === 0);
-  var y = hasIntro ? 68 : 36; // intro sits below the badge
+  var y = hasIntro ? 48 : 36;
   var x = 12;
   for (var i=0;i<lines.length;i++){ ctx.fillText(lines[i], x, y); y += 22; }
 }
@@ -471,7 +431,6 @@ function renderDisplay() {
   lines.push('');
   lines.push('#   Time(s)  m/s    mph');
 
-  // Show newest first
   var shown = Math.min(6, measurements.length);
   for (var i=0; i<shown; i++){
     var idx = measurements.length - 1 - i;
@@ -487,7 +446,6 @@ function renderDisplay() {
   updateQualityBadge();
 }
 
-/* ====== Metrics formatting ====== */
 function fmtMetric(ms){
   if (!isFinite(ms)) return '— m/s | — mph';
   var mps  = Number(ms).toFixed(2);
@@ -497,7 +455,6 @@ function fmtMetric(ms){
   return mpsP + ' m/s | ' + mphP + ' mph';
 }
 
-/* ====== Timing & measurement ====== */
 function tick() {
   if (measuring) {
     var elapsed = (nowMs() - startTime) / 1000;
@@ -541,7 +498,6 @@ function deleteLastSample() {
   updateTabVisibility();
 }
 
-/* ====== End Survey / Results ====== */
 addRobustTap(endSurveyBtn, function(){
   if (measurements.length === 0) { alert('No measurements recorded!'); return; }
   resultsUnlocked = true;
@@ -551,7 +507,6 @@ addRobustTap(endSurveyBtn, function(){
   renderSummaryBox();
 });
 
-/* ====== Results rendering ====== */
 function percentile(sortedArray, p) {
   if (sortedArray.length === 0) return 0;
   var idx = (p / 100) * (sortedArray.length - 1);
@@ -574,20 +529,51 @@ function renderResultsTable() {
     resultsTbody.appendChild(tr);
   }
 }
+
+function formatAlignedLines(labelValuePairs) {
+  var longest = 0;
+  for (var i=0; i<labelValuePairs.length; i++) {
+    if (labelValuePairs[i].label.length > longest) longest = labelValuePairs[i].label.length;
+  }
+  var out = [];
+  for (var j=0; j<labelValuePairs.length; j++) {
+    var L = labelValuePairs[j].label;
+    var pad = ' '.repeat(longest - L.length + 1);
+    out.push(L + pad + ': ' + labelValuePairs[j].value);
+  }
+  return out;
+}
+function renderResultsPlaceholders() {
+  var lines = formatAlignedLines([
+    { label: 'Avg Speed',  value: '— m/s | — mph' },
+    { label: '85th %tile', value: '— m/s | — mph' },
+    { label: '15th %tile', value: '— m/s | — mph' },
+    { label: '5th %tile',  value: '— m/s | — mph' }
+  ]);
+  resultAvg.textContent = lines[0];
+  resultP85.textContent = lines[1];
+  resultP15.textContent = lines[2];
+  resultP05.textContent = lines[3];
+}
+
 function renderSummaryBox() {
   var speeds = measurements.map(function(x){ return x.speed; }).sort(function(a,b){ return a - b; });
   function pct(sorted, p){ if (!sorted.length) return NaN; var idx=(p/100)*(sorted.length-1), lo=Math.floor(idx), hi=Math.ceil(idx); if (hi>=sorted.length) return sorted[lo]; var w=idx-lo; return sorted[lo]*(1-w)+sorted[hi]*w; }
-  var avg = NaN; if (speeds.length){ avg = speeds.reduce(function(a,b){return a+b;},0)/speeds.length; }
-  var p85 = pct(speeds, 85);
-  var p15 = pct(speeds, 15);
-  var p05 = pct(speeds, 5);
-  resultAvg.textContent = 'Avg Speed  : ' + fmtMetric(avg);
-  resultP85.textContent = '85th %tile : ' + fmtMetric(p85);
-  resultP15.textContent = '15th %tile : ' + fmtMetric(p15);
-  resultP05.textContent = '5th  %tile : ' + fmtMetric(p05);
+  var avg = speeds.length ? speeds.reduce(function(a,b){return a+b;},0)/speeds.length : NaN;
+  var p85 = pct(speeds, 85), p15 = pct(speeds, 15), p05 = pct(speeds, 5);
+
+  var lines = formatAlignedLines([
+    { label: 'Avg Speed',  value: fmtMetric(avg) },
+    { label: '85th %tile', value: fmtMetric(p85) },
+    { label: '15th %tile', value: fmtMetric(p15) },
+    { label: '5th %tile',  value: fmtMetric(p05) }
+  ]);
+  resultAvg.textContent = lines[0];
+  resultP85.textContent = lines[1];
+  resultP15.textContent = lines[2];
+  resultP05.textContent = lines[3];
 }
 
-/* ====== Save TXT (aligned) ====== */
 function buildTxtContent() {
   function pad(str, len, alignRight) {
     str = String(str);
@@ -673,7 +659,6 @@ function downloadText(filename, content) {
   }
 }
 
-/* ====== UI helpers ====== */
 function applyMeasureBtnEnabled(enabled) {
   if (enabled && !measuring) {
     measureBtn.classList.remove('btn-disabled');
@@ -690,7 +675,6 @@ function updateEndSurveyColor() {
   else { endSurveyBtn.style.backgroundColor = '#2e7d32'; }
 }
 
-/* ====== Metrics updater ====== */
 function updateMetricsBars(){
   if (countMetric) countMetric.textContent = String(measurements.length);
   if (!avgMetric || !p85Metric) return;
@@ -708,7 +692,6 @@ function updateMetricsBars(){
   p85Metric.textContent = fmtMetric(p85);
 }
 
-/* ====== Toggle handler (Start/Stop) ====== */
 window.toggleHandler = function(e) {
   if (e && e.preventDefault) e.preventDefault();
   if (!formIsValid()) {
@@ -717,29 +700,23 @@ window.toggleHandler = function(e) {
     return;
   }
   var t = nowMs();
-  if (t - (window._lastToggleTime || 0) < 350) return; // debounce
+  if (t - (window._lastToggleTime || 0) < 350) return;
   window._lastToggleTime = t;
   if (!measuring) startMeasurement(); else finishMeasurement();
 };
 
-/* ====== Clear & Reset (from Results) ====== */
 function clearAllAndReset() {
   if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
   measuring = false;
   measureBtn.textContent = 'Start';
   measureBtn.style.backgroundColor = '#4CAF50';
   measurements.length = 0;
-  // Also clear Arm and Distance as requested in earlier spec
   armInput.value = '';
   distanceInput.value = '';
   resultsUnlocked = false;
-  // Reset metrics and results text
   timerMetric.textContent = '0.00 s';
-  resultAvg.textContent = 'Avg Speed  : — m/s | — mph';
-  resultP85.textContent = '85th %tile : — m/s | — mph';
-  resultP15.textContent = '15th %tile : — m/s | — mph';
-  resultP05.textContent = '5th  %tile : — m/s | — mph';
   renderResultsTable();
+  renderResultsPlaceholders();
   renderDisplay();
   updateEndSurveyColor();
   updateMetricsBars();
@@ -747,10 +724,9 @@ function clearAllAndReset() {
   showTab('detailsTab');
 }
 
-/* ====== Wire events ====== */
 deleteLastBtn.addEventListener('click', deleteLastSample, false);
 document.getElementById('saveResultsBtn').addEventListener('click', function(){
-  if (!resultsUnlocked) { alert('Press "End Survey" first.'); return; }
+  if (!resultsUnlocked) { alert('Press \"End Survey\" first.'); return; }
   if (measurements.length === 0) { alert('No measurements to save.'); return; }
   downloadText(makeFilename(), buildTxtContent());
 }, false);
@@ -760,7 +736,6 @@ document.getElementById('clearDataBtn').addEventListener('click', function(){
   }
 }, false);
 
-/* Live inputs */
 var liveInputs = [siteInput, junctionInput, armInput, dateInput, distanceInput];
 for (var ii=0; ii<liveInputs.length; ii++){
   liveInputs[ii].addEventListener('input', function(){
@@ -779,9 +754,7 @@ for (var ii=0; ii<liveInputs.length; ii++){
   }, false);
 }
 
-/* ====== Init ====== */
 function onReady(){
-  // default date if empty
   if (!dateInput.value) {
     var d = new Date();
     var yyyy = d.getFullYear();
@@ -790,6 +763,7 @@ function onReady(){
     dateInput.value = yyyy + '-' + mm + '-' + dd;
   }
   resizeCanvas();
+  renderResultsPlaceholders();
   renderDisplay();
   updateTabVisibility();
   updateMetricsBars();
