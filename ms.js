@@ -181,7 +181,7 @@ function drawLines(lines) {
   ctx.font = '16px monospace';
   ctx.fillStyle = '#000';
   var hasIntro = (measurements.length === 0);
-  var y = hasIntro ? 48 : 36;
+  var y = hasIntro ? 36 : 24;
   var x = 12;
   for (var i=0;i<lines.length;i++){ ctx.fillText(lines[i], x, y); y += 22; }
 }
