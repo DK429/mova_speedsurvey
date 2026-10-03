@@ -1,0 +1,35 @@
+name: Mobile layout
+
+on:
+  push:
+    branches: [fix/mobile-orientation-layout]
+  pull_request:
+    branches: [main]
+    paths:
+      - index.html
+      - ms.css
+      - ms.js
+      - tests/**
+      - .github/workflows/mobile-layout.yml
+
+permissions:
+  contents: read
+
+jobs:
+  phone-layout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-save --package-lock=false playwright@1.56.1
+      - run: npx playwright install --with-deps chromium webkit
+      - run: node --test tests/mobile-layout.test.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mobile-layout-screenshots
+          path: test-artifacts/
+          if-no-files-found: ignore

@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { resolve } = require('node:path');
 const { pathToFileURL } = require('node:url');
+const { mkdir } = require('node:fs/promises');
 const { chromium, webkit } = require('playwright');
 
 const appUrl = pathToFileURL(resolve(__dirname, '../index.html')).href;
@@ -20,7 +21,7 @@ async function checkLayout(page, tab) {
       controls: [...document.querySelectorAll('.tab-btn'), ...panel.querySelectorAll('button, input')]
         .map(el => {
           const rect = el.getBoundingClientRect();
-          return { id: el.id, left: rect.left, right: rect.right, width: rect.width };
+          return { id: el.id, left: rect.left, right: rect.right, width: rect.width, height: rect.height, button: el.tagName === 'BUTTON' };
         }),
     };
   }, tab);
@@ -28,8 +29,22 @@ async function checkLayout(page, tab) {
   for (const control of layout.controls) {
     assert.ok(control.width > 0 && control.left >= -1 && control.right <= layout.viewport + 1,
       `Control is off screen: ${JSON.stringify(control)}`);
+    if (control.button) assert.ok(control.height >= 48, `Button is too small to tap: ${JSON.stringify(control)}`);
   }
   if (tab === 'measureTab') {
+    const actions = await page.evaluate(() => {
+      const rect = id => {
+        const r = document.getElementById(id).getBoundingClientRect();
+        return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, width: r.width, height: r.height };
+      };
+      return { primary: rect('measureBtn'), remove: rect('deleteLastBtn'), end: rect('endSurveyBtn'), history: rect('canvas') };
+    });
+    assert.ok(actions.primary.width >= 144 && actions.primary.height >= 144, 'Start/Stop must be a large target');
+    assert.ok(Math.abs(actions.primary.width - actions.primary.height) < 1, 'Start/Stop must stay circular after rotation');
+    assert.ok(actions.remove.top >= actions.primary.bottom + 12 && actions.end.top >= actions.primary.bottom + 12,
+      'Secondary actions must be separated below Start/Stop');
+    assert.ok(actions.end.left >= actions.remove.right + 12, 'Secondary actions need a clear gap');
+    assert.ok(actions.history.top >= Math.max(actions.remove.bottom, actions.end.bottom), 'History must follow the controls');
     const canvas = await page.evaluate(() => {
       const canvas = document.getElementById('canvas');
       const rect = canvas.getBoundingClientRect();
@@ -89,6 +104,11 @@ for (const [engine, browserType] of Object.entries({ chromium, webkit })) {
         await page.waitForTimeout(400); // The existing Start/Stop debounce is 350ms.
         await page.locator('#measureBtn').click();
         assert.equal(await page.locator('#countMetric').textContent(), '1');
+
+        if (width === 375 && process.env.CI) {
+          await mkdir(resolve(__dirname, '../test-artifacts'), { recursive: true });
+          await page.locator('#measureTab').screenshot({ path: resolve(__dirname, `../test-artifacts/${engine}-measurement.png`) });
+        }
         await checkLayout(page, 'measureTab');
         await rotate(page, portrait, 'measureTab');
         assert.equal(await page.locator('#countMetric').textContent(), '1');

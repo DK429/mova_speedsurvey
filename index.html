@@ -7,11 +7,11 @@
   <link rel="stylesheet" href="ms.css">
 </head>
 <body>
-  <h2>MOVA SPEED SURVEY v3.3</h2>
+  <h2>MOVA Speed Survey <span class="app-version">v3.3</span></h2>
 
   <div class="tabs">
-    <button class="tab-btn active" data-tab="detailsTab" id="detailsTabBtn" type="button">1. Junction Details</button>
-    <button class="tab-btn" data-tab="measureTab" id="measureTabBtn" type="button" disabled aria-disabled="true" title="Complete Junction Details first">2. Measurements</button>
+    <button class="tab-btn active" data-tab="detailsTab" id="detailsTabBtn" type="button" aria-label="1. Junction Details">1. Details</button>
+    <button class="tab-btn" data-tab="measureTab" id="measureTabBtn" type="button" aria-label="2. Measurements" disabled aria-disabled="true" title="Complete Junction Details first">2. Measure</button>
     <button class="tab-btn" data-tab="resultsTab" id="resultsTabBtn" type="button" disabled aria-disabled="true" title="Press End Survey to view results">3. Results</button>
   </div>
 
@@ -60,25 +60,24 @@
         </div>
       </div>
 
-      <div class="canvas-wrap" id="canvasWrap">
-        <canvas id="canvas" width="460" height="240"></canvas>
-      </div>
-
-      <div style="text-align:center; margin-top: 6px;">
+      <div class="measurement-actions">
         <button id="measureBtn" type="button" class="btn-disabled" style="background-color:#999;" title="Start or stop timing"
                 onclick="if(window.toggleHandler){window.toggleHandler(event);} return false;">Start</button>
-        <button id="deleteLastBtn" type="button">Delete Last Sample</button>
+        <div class="secondary-actions">
+          <button id="deleteLastBtn" type="button">Delete Last<br>Sample</button>
+          <button id="endSurveyBtn" type="button">End Survey</button>
+        </div>
       </div>
 
       <div class="metrics-bar" id="metricsBottom" aria-live="polite" style="border-bottom:none;">
         <div class="metric"><span class="label">Avg Spd</span><span class="value" id="avgMetric">— m/s | — mph</span></div>
         <div class="metric"><span class="label">85%</span><span class="value" id="p85Metric">— m/s | — mph</span></div>
       </div>
+      <p class="history-heading">Recent samples</p>
+      <div class="canvas-wrap" id="canvasWrap">
+        <canvas id="canvas" width="460" height="240" aria-label="Recent samples, newest first"></canvas>
+      </div>
     </fieldset>
-    <p class="helper one-line">Click End Survey to see results.</p>
-    <div style="text-align:center;">
-      <button id="endSurveyBtn" type="button">End Survey</button>
-    </div>
   </div>
 
   <div id="resultsTab" class="tab-content hidden" aria-hidden="true">
