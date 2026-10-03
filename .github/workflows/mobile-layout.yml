@@ -9,6 +9,7 @@ on:
       - index.html
       - ms.css
       - ms.js
+      - layout.js
       - tests/**
       - .github/workflows/mobile-layout.yml
 

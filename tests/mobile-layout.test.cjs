@@ -22,7 +22,7 @@ async function checkLayout(page, tab) {
         .map(el => {
           const rect = el.getBoundingClientRect();
           return { id: el.id, left: rect.left, right: rect.right, width: rect.width, height: rect.height, button: el.tagName === 'BUTTON' };
-        }),
+        }).filter(control => control.width > 0 || control.height > 0),
     };
   }, tab);
   assert.ok(layout.scrollWidth <= layout.viewport + 1, `Page overflows: ${JSON.stringify(layout)}`);
@@ -37,28 +37,16 @@ async function checkLayout(page, tab) {
         const r = document.getElementById(id).getBoundingClientRect();
         return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, width: r.width, height: r.height };
       };
-      return { primary: rect('measureBtn'), remove: rect('deleteLastBtn'), end: rect('endSurveyBtn'), history: rect('canvas') };
+      return { primary: rect('measureBtn'), remove: rect('deleteLastBtn'), end: rect('endSurveyBtn'), history: rect('measureSamplesWrap') };
     });
-    assert.ok(actions.primary.width >= 144 && actions.primary.height >= 144, 'Start/Stop must be a large target');
+    assert.equal(actions.primary.width, 164, 'Preserve the approved Start/Stop diameter');
+    assert.equal(actions.primary.height, 164);
     assert.ok(Math.abs(actions.primary.width - actions.primary.height) < 1, 'Start/Stop must stay circular after rotation');
     assert.ok(actions.remove.top >= actions.primary.bottom + 12 && actions.end.top >= actions.primary.bottom + 12,
       'Secondary actions must be separated below Start/Stop');
     assert.ok(actions.end.left >= actions.remove.right + 12, 'Secondary actions need a clear gap');
     assert.ok(actions.history.top >= Math.max(actions.remove.bottom, actions.end.bottom), 'History must follow the controls');
-    const canvas = await page.evaluate(() => {
-      const canvas = document.getElementById('canvas');
-      const rect = canvas.getBoundingClientRect();
-      const wrap = document.getElementById('canvasWrap').getBoundingClientRect();
-      return {
-        left: rect.left, right: rect.right, wrapLeft: wrap.left, wrapRight: wrap.right,
-        width: canvas.width, height: canvas.height,
-        cssWidth: canvas.clientWidth, cssHeight: canvas.clientHeight, dpr: devicePixelRatio,
-      };
-    });
-    assert.ok(canvas.left >= canvas.wrapLeft - 1 && canvas.right <= canvas.wrapRight + 1,
-      `Canvas exceeds its container: ${JSON.stringify(canvas)}`);
-    assert.equal(canvas.width, Math.round(canvas.cssWidth * canvas.dpr));
-    assert.equal(canvas.height, Math.round(canvas.cssHeight * canvas.dpr));
+
   }
 }
 
@@ -70,7 +58,7 @@ async function rotate(page, portrait, tab) {
 }
 
 for (const [engine, browserType] of Object.entries({ chromium, webkit })) {
-  for (const width of [320, 375, 390, 430]) {
+  for (const width of [320, 360, 375, 390, 402, 430]) {
     test(`${engine}: ${width}px phone returns to portrait without losing controls or samples`, async () => {
       const browser = await browserType.launch({ headless: true });
       try {
@@ -91,7 +79,7 @@ for (const [engine, browserType] of Object.entries({ chromium, webkit })) {
         await checkLayout(page, 'measureTab');
         for (let i = 0; i < 3; i++) await rotate(page, portrait, 'measureTab');
 
-        // Resize while the canvas is hidden, then reopen Measurements.
+        // Rotate while Measurements is hidden, then reopen it.
         await page.locator('#detailsTabBtn').click();
         await rotate(page, portrait, 'detailsTab');
         await page.locator('#measureTabBtn').click();
