@@ -53,6 +53,7 @@ var startTime = 0;
 var rafId = null;
 var measurements = [];
 var resultsUnlocked = false;
+var renderExtraSummary = function() {};
 
 /* ===== Metric label alignment ===== */
 function alignMetricGroup(labelNodes) {
@@ -171,15 +172,14 @@ addRobustTap(measureTabBtn, function(){ updateTabVisibility(); showTab('measureT
 addRobustTap(resultsTabBtn, function(){ updateTabVisibility(); showTab('resultsTab'); });
 addRobustTap(gotoMeasureBtn, function(){ updateTabVisibility(); showTab('measureTab'); });
 
-var BASE_W = 460, BASE_H = 240, BASE_RATIO = BASE_H / BASE_W;
 function resizeCanvas(){
   if (!canvas || !canvasWrap) return;
+  // CSS controls the displayed size. Never feed the previous orientation's
+  // pixel width back into the layout, which can prevent the fieldset shrinking.
+  var cssWidth = canvas.clientWidth;
+  var cssHeight = canvas.clientHeight;
+  if (!cssWidth || !cssHeight) return; // The Measurements tab may be hidden.
   var dpr = window.devicePixelRatio || 1;
-  var cssWidth = canvasWrap.clientWidth;
-  var cssHeight = Math.round(cssWidth * BASE_RATIO);
-
-  canvas.style.width = cssWidth + 'px';
-  canvas.style.height = cssHeight + 'px';
 
   canvas.width = Math.round(cssWidth * dpr);
   canvas.height = Math.round(cssHeight * dpr);
@@ -208,6 +208,15 @@ function updateQualityBadge(){
 function drawLines(lines) {
   ctx.clearRect(0,0,canvas.width,canvas.height);
   ctx.font = '16px monospace';
+  // Keep complete rows readable when the history is narrower on a phone.
+  var availableWidth = Math.max(1, canvas.clientWidth - 24);
+  var longestWidth = 0;
+  for (var lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+    longestWidth = Math.max(longestWidth, ctx.measureText(lines[lineIndex]).width);
+  }
+  if (longestWidth > availableWidth) {
+    ctx.font = (16 * availableWidth / longestWidth) + 'px monospace';
+  }
   ctx.fillStyle = '#000';
   var y = 18; // Start text near the very top of the canvas
   var x = 12;
@@ -365,64 +374,37 @@ function renderSummaryBox() {
   resultP85.textContent = lines[1];
   resultP15.textContent = lines[2];
   resultP05.textContent = lines[3];
+  renderExtraSummary(speeds);
 }
 
 function buildTxtContent() {
-  function pad(str, len, alignRight) {
-    str = String(str);
-    if (str.length >= len) return str;
-    var spaces = Array(len - str.length + 1).join(' ');
-    return alignRight ? spaces + str : str + spaces;
-  }
-  function numf(n, len) { return pad((isFinite(n) ? Number(n).toFixed(2) : '0.00'), len, true); }
-  function numi(n, len) { return pad(parseInt(n, 10), len, true); }
-
-  var lines = [];
-  var distance = parseFloat(distanceInput.value) || 0;
-  lines.push('JUNCTION DETAILS');
+  var lines = ['MOVA SPEED SURVEY v3.4', '', 'JUNCTION DETAILS'];
   lines.push('Site Number        : ' + (siteInput.value || 'N/A'));
   lines.push('Junction Location  : ' + (junctionInput.value || 'N/A'));
   lines.push('Arm                : ' + (armInput.value || 'N/A'));
-  lines.push('Date               : ' + (dateInput.value || new Date().toISOString().split('T')[0]));
-  lines.push('Distance of Travel : ' + distance + ' m');
-  lines.push('');
-  lines.push('MEASUREMENTS');
-  var W_IDX = 5, W_TIME = 10, W_MS = 12, W_MPH = 12;
-  var header = pad('#', W_IDX, true) + ' ' + pad('Time (s)', W_TIME, true) + ' ' + pad('Speed (m/s)', W_MS, true) + ' ' + pad('Speed (mph)', W_MPH, true);
-  lines.push(header);
-  lines.push(Array(header.length + 1).join('-'));
-  for (var i = 0; i < measurements.length; i++) {
-    var m = measurements[i];
-    var row = numi(i + 1, W_IDX) + ' ' + numf(m.time, W_TIME) + ' ' + numf(m.speed, W_MS) + ' ' + numf(m.mph, W_MPH);
-    lines.push(row);
-  }
-  if (measurements.length === 0) lines.push('(no measurements)');
-  lines.push('');
-  var speeds = measurements.map(function(x){ return x.speed; }).sort(function(a,b){ return a - b; });
-  function percentile(sorted, p) { if (!sorted.length) return NaN; var idx=(p/100)*(sorted.length-1), lo=Math.floor(idx), hi=Math.ceil(idx); if (hi>=sorted.length) return sorted[lo]; var w=idx-lo; return sorted[lo]*(1-w)+sorted[hi]*w; }
-  var avg = NaN; if (speeds.length) { avg = speeds.reduce(function(a,b){return a+b;},0)/speeds.length; }
-  var p85 = percentile(speeds, 85);
-  var p15 = percentile(speeds, 15);
-  var p5  = percentile(speeds, 5);
+  lines.push('Date               : ' + (dateInput.value || 'N/A'));
+  lines.push('Distance of Travel : ' + distanceInput.value + ' m');
+  lines.push('Samples            : ' + measurements.length);
+  lines.push('', 'RESULTS SUMMARY');
 
-  function metricRow(label, ms){
-    var val = isFinite(ms) ? (function(){
-      var mps = Number(ms).toFixed(2);
-      var mph = Number(ms * 2.23694).toFixed(2);
-      var mpsP = padLeft(mps, 6);
-      var mphP = padLeft(mph, 6);
-      return mpsP + ' m/s | ' + mphP + ' mph';
-    })() : '   — m/s |    — mph';
-    return pad(label, 18, false) + ' : ' + val;
+  // Save every displayed statistic exactly, including its units and quality.
+  // Recalculating from rounded table speeds can disagree with the screen.
+  var summary = document.querySelectorAll('.summary span');
+  for (var i = 0; i < summary.length; i++) {
+    var text = summary[i].textContent.trim();
+    if (text) lines.push(text);
   }
-  lines.push('RESULTS');
-  lines.push(metricRow('Average Speed',   avg));
-  lines.push(metricRow('85th Percentile', p85));
-  lines.push(metricRow('15th Percentile', p15));
-  lines.push(metricRow('5th Percentile',  p5));
 
-  return lines.join('\n');
+  lines.push('', 'MEASUREMENTS');
+  lines.push('#\tTime (s)\tSpeed (m/s)\tSpeed (mph)');
+  // Use the complete sample collection, not the seven-row measurement history.
+  for (var j = 0; j < measurements.length; j++) {
+    var sample = measurements[j];
+    lines.push([j + 1, sample.time.toFixed(2), sample.speed.toFixed(2), sample.mph.toFixed(2)].join('\t'));
+  }
+  return lines.join('\r\n') + '\r\n';
 }
+
 function trunc(s, n) { return String(s || '').length <= n ? String(s || '') : String(s || '').slice(0, n); }
 function sanitizeFilePart(s) { return String(s || '').replace(/[^A-Za-z0-9_-]/g, '_'); }
 function makeFilename() {
@@ -437,7 +419,7 @@ function makeFilename() {
 }
 function downloadText(filename, content) {
   try {
-    var blob = new Blob([content], { type: 'text/plain' });
+    var blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.href = url;
@@ -510,6 +492,7 @@ function clearAllAndReset() {
   timerMetric.textContent = '0.00 s';
   renderResultsTable();
   renderResultsPlaceholders();
+  renderExtraSummary([]);
   renderDisplay();
   updateEndSurveyColor();
   updateMetricsBars();
@@ -557,6 +540,7 @@ function onReady(){
   }
   resizeCanvas();
   renderResultsPlaceholders();
+  renderExtraSummary([]);
   renderDisplay();
   updateTabVisibility();
   updateMetricsBars();
@@ -565,6 +549,12 @@ function onReady(){
   showTab('detailsTab');
 }
 window.addEventListener('resize', function(){ resizeCanvas(); alignAllMetricLabels(); }, false);
+// Observe the final container size as mobile browsers settle after rotation,
+// and when a hidden Measurements tab becomes visible again.
+if (window.ResizeObserver && canvasWrap) {
+  var canvasResizeObserver = new ResizeObserver(resizeCanvas);
+  canvasResizeObserver.observe(canvasWrap);
+}
 document.addEventListener('visibilitychange', function(){ if (!document.hidden) { resizeCanvas(); alignAllMetricLabels(); } }, false);
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', onReady, false);
@@ -605,7 +595,6 @@ if (document.readyState === 'loading') {
 
 /* ===== Extra Results Metrics + Save Enhancements (2025-10-12) ===== */
 (function(){
-  function toNumber(x){ var n = Number(x); return Number.isFinite(n) ? n : NaN; }
   function mpsToMph(mps){ return Number.isFinite(mps) ? mps * 2.2369362921 : NaN; }
   function mean(arr){ return arr.length ? arr.reduce((a,b)=>a+b,0) / arr.length : NaN; }
   function sampleSD(arr){
@@ -616,22 +605,6 @@ if (document.readyState === 'loading') {
     for (var i=0;i<n;i++) v += Math.pow(arr[i]-mu,2);
     v /= (n-1);
     return Math.sqrt(v);
-  }
-  function qualityFromSpeeds(speeds){
-    // Placeholder; overridden by final quality patch below
-    var n = speeds.length;
-    if (n === 0) return {label:"—", cls:""};
-    var mu = mean(speeds);
-    var sd = sampleSD(speeds);
-    var cov = (mu>0 && Number.isFinite(sd)) ? (sd/mu) : Infinity;
-    var label = "Fair", cls = "quality-fair";
-    if (n < 5){ label = "Low"; cls = "quality-low"; }
-    else if (cov < 0.05){ label = "Very Good"; cls = "quality-vgood"; }
-    else if (cov < 0.12){ label = "Good"; cls = "quality-good"; }
-    else if (cov < 0.25){ label = "Fair"; cls = "quality-fair"; }
-    else if (cov < 0.40){ label = "Low"; cls = "quality-low"; }
-    else { label = "Poor"; cls = "quality-poor"; }
-    return {label, cls, sd, cov};
   }
   function fmtFixed(n, d){ return Number.isFinite(n) ? n.toFixed(d) : "—"; }
   function fmtSpeedPair(mps){ return fmtFixed(mps,2) + " m/s | " + fmtFixed(mpsToMph(mps),2) + " mph"; }
@@ -657,113 +630,22 @@ if (document.readyState === 'loading') {
     };
   }
 
-  function parseSpeedsFromTable(){
-    var rows = Array.from(document.querySelectorAll("#resultsTable tbody tr"));
-    var speeds = [];
-    rows.forEach(function(tr){
-      var tds = tr.querySelectorAll("td");
-      if (tds.length >= 4){
-        var mps = toNumber((tds[2].textContent || "").trim());
-        if (Number.isFinite(mps)) speeds.push(mps);
-      }
-    });
-    return speeds;
-  }
-
-  function computeAndRenderExtraSummary(){
+  // Use every retained, full-precision sample. This runs synchronously from
+  // renderSummaryBox for touch, mouse and keyboard navigation alike.
+  renderExtraSummary = function(speeds){
     var spans = ensureSummarySpans();
-    var speeds = parseSpeedsFromTable();
     var max = speeds.length ? Math.max.apply(null, speeds) : NaN;
-    var q = qualityFromSpeeds(speeds);
+    var sd = sampleSD(speeds);
+    var chip = document.getElementById("qualityInline");
+    var quality = chip ? chip.textContent.split(":").slice(1).join(":").trim() : "—";
     if (spans.max) spans.max.textContent = "Max speed: " + fmtSpeedPair(max);
-    if (spans.sd) spans.sd.textContent = "Standard deviation: " + fmtFixed(q.sd, 3) + " m/s";
-    if (spans.qual) spans.qual.textContent = "Quality: " + q.label;
-
+    // SD is a statistic, independent of count-based quality classification.
+    if (spans.sd) spans.sd.textContent = "Standard deviation: " + fmtFixed(sd, 3) + " m/s";
+    if (spans.qual) spans.qual.textContent = "Quality: " + (quality || "—");
     if (window.__formatSummaryAlignment){ window.__formatSummaryAlignment(); }
-  }
-
-  // Hook events
-  ["click"].forEach(function(evt){
-    var endBtn = document.getElementById("endSurveyBtn");
-    if (endBtn){ endBtn.addEventListener(evt, function(){ setTimeout(computeAndRenderExtraSummary, 0); }); }
-    var resBtn = document.getElementById("resultsTabBtn");
-    if (resBtn){ resBtn.addEventListener(evt, function(){ setTimeout(computeAndRenderExtraSummary, 0); }); }
-  });
-  if (document.readyState === "loading"){
-    document.addEventListener("DOMContentLoaded", function(){ setTimeout(computeAndRenderExtraSummary, 0); });
-  } else {
-    setTimeout(computeAndRenderExtraSummary, 0);
-  }
-
-  // Enhanced save
-  var saveBtnInit = function(){
-    var saveBtn = document.getElementById("saveResultsBtn");
-    if (!saveBtn) return;
-    saveBtn.addEventListener("click", function(ev){
-      try{
-        ev.preventDefault(); ev.stopImmediatePropagation();
-        // Data
-        var site = (document.getElementById("site")||{}).value || "";
-        var dist = toNumber((document.getElementById("distance")||{}).value || "");
-        var date = (document.getElementById("date")||{}).value || "";
-        var junction = (document.getElementById("junction")||{}).value || "";
-        var arm = (document.getElementById("arm")||{}).value || "";
-
-        var rows = Array.from(document.querySelectorAll("#resultsTable tbody tr"));
-        var times = [], speeds = [];
-        rows.forEach(function(tr){
-          var tds = tr.querySelectorAll("td");
-          var t = toNumber((tds[1]?.textContent||"").trim());
-          var mps = toNumber((tds[2]?.textContent||"").trim());
-          if (!Number.isFinite(mps) && Number.isFinite(t) && Number.isFinite(dist) && t>0){
-            mps = dist / t;
-          }
-          if (Number.isFinite(t)) times.push(t);
-          if (Number.isFinite(mps)) speeds.push(mps);
-        });
-
-        var maxSpd = speeds.length ? Math.max.apply(null, speeds) : NaN;
-        // temporary quality until overridden
-        var mu = mean(speeds); var sd = (function(){ var n=speeds.length;if(n<2) return NaN;var v=0;for(var i=0;i<n;i++) v+=(speeds[i]-mu)**2;return Math.sqrt(v/(n-1));})();
-        var q = qualityFromSpeeds(speeds);
-
-        var out = [];
-        out.push("MOVA SPEED SURVEY v3.3");
-        out.push("Site: " + site);
-        out.push("Junction: " + junction);
-        out.push("Arm: " + arm);
-        out.push("Date: " + date);
-        out.push("Distance (m): " + (Number.isFinite(dist) ? dist : ""));
-        out.push("Max speed: " + (Number.isFinite(maxSpd)?maxSpd.toFixed(2):"") + " m/s | " + (Number.isFinite(maxSpd)?(maxSpd*2.2369362921).toFixed(2):"") + " mph");
-        out.push("Standard deviation (m/s): " + (Number.isFinite(sd)?sd.toFixed(3):"—"));
-        out.push("Quality: " + q.label);
-        out.push("");
-        out.push("#\tTime (s)\tSpeed (m/s)\tSpeed (mph)");
-        rows.forEach(function(tr, i){
-          var tds = tr.querySelectorAll("td");
-          var t = toNumber((tds[1]?.textContent||"").trim());
-          var mps = toNumber((tds[2]?.textContent||"").trim());
-          if (!Number.isFinite(mps) && Number.isFinite(dist) && Number.isFinite(t) && t>0){
-            mps = dist / t;
-          }
-          var mph = Number.isFinite(mps) ? mps*2.2369362921 : NaN;
-          out.push((i+1) + "\t" + (Number.isFinite(t)?t.toFixed(2):"") + "\t" + (Number.isFinite(mps)?mps.toFixed(2):"") + "\t" + (Number.isFinite(mph)?mph.toFixed(2):""));
-        });
-
-        var blob = new Blob([out.join("\\n")], {type:"text/plain;charset=utf-8"});
-        var a = document.createElement("a");
-        a.download = (site || "mova_survey") + "_" + Date.now() + ".txt";
-        a.href = URL.createObjectURL(blob);
-        a.click();
-        URL.revokeObjectURL(a.href);
-      }catch(e){ console.error(e); }
-    }, true);
   };
-  if (document.readyState === "loading"){
-    document.addEventListener("DOMContentLoaded", saveBtnInit);
-  } else {
-    saveBtnInit();
-  }
+
+
 })();
 
 
@@ -1098,76 +980,7 @@ if (document.readyState === 'loading') {
     bindSync();
   }
 
-  // Override save to use chip text
-  function installSaveOverride(){
-    var saveBtn = document.getElementById("saveResultsBtn");
-    if (!saveBtn) return;
-    saveBtn.addEventListener("click", function(ev){
-      try{
-        ev.preventDefault(); ev.stopImmediatePropagation();
-        // Collect data for saving (reuse existing DOM)
-        function toNumber(x){ var n = Number(x); return Number.isFinite(n) ? n : NaN; }
-        function mpsToMph(mps){ return Number.isFinite(mps) ? mps * 2.2369362921 : NaN; }
 
-        var site = (document.getElementById("site")||{}).value || "";
-        var dist = toNumber((document.getElementById("distance")||{}).value || "");
-        var date = (document.getElementById("date")||{}).value || "";
-        var junction = (document.getElementById("junction")||{}).value || "";
-        var arm = (document.getElementById("arm")||{}).value || "";
-
-        var rows = Array.from(document.querySelectorAll("#resultsTable tbody tr"));
-        var out = [];
-        out.push("MOVA SPEED SURVEY v3.3");
-        out.push("Site: " + site);
-        out.push("Junction: " + junction);
-        out.push("Arm: " + arm);
-        out.push("Date: " + date);
-        out.push("Distance (m): " + (Number.isFinite(dist) ? dist : ""));
-
-        // Max speed (recompute from table to avoid stale)
-        var speeds = [];
-        rows.forEach(function(tr){
-          var tds = tr.querySelectorAll("td");
-          var t = toNumber((tds[1]?.textContent||"").trim());
-          var mps = toNumber((tds[2]?.textContent||"").trim());
-          if (!Number.isFinite(mps) && Number.isFinite(dist) && Number.isFinite(t) && t>0){
-            mps = dist / t;
-          }
-          if (Number.isFinite(mps)) speeds.push(mps);
-        });
-        var maxSpd = speeds.length ? Math.max.apply(null, speeds) : NaN;
-        out.push("Max speed: " + (Number.isFinite(maxSpd)?maxSpd.toFixed(2):"") + " m/s | " + (Number.isFinite(maxSpd)?(maxSpd*2.2369362921).toFixed(2):"") + " mph");
-
-        // Quality from chip
-        out.push("Quality: " + chipQualityText());
-
-        out.push("");
-        out.push("#\tTime (s)\tSpeed (m/s)\tSpeed (mph)");
-        rows.forEach(function(tr, i){
-          var tds = tr.querySelectorAll("td");
-          var t = toNumber((tds[1]?.textContent||"").trim());
-          var mps = toNumber((tds[2]?.textContent||"").trim());
-          if (!Number.isFinite(mps) && Number.isFinite(dist) && Number.isFinite(t) && t>0){
-            mps = dist / t;
-          }
-          var mph = mpsToMph(mps);
-          out.push((i+1) + "\t" + (Number.isFinite(t)?t.toFixed(2):"") + "\t" + (Number.isFinite(mps)?mps.toFixed(2):"") + "\t" + (Number.isFinite(mph)?mph.toFixed(2):""));
-        });
-
-        var blob = new Blob([out.join("\n")], {type:"text/plain;charset=utf-8"});
-        var a = document.createElement("a");
-        a.download = (site || "mova_survey") + "_" + Date.now() + ".txt";
-        a.href = URL.createObjectURL(blob);
-        a.click();
-        URL.revokeObjectURL(a.href);
-      }catch(e){ console.error(e); }
-    }, true);
-  }
-  if (document.readyState === "loading"){
-    document.addEventListener("DOMContentLoaded", installSaveOverride);
-  } else {
-    installSaveOverride();
-  }
 })();
 
 
@@ -1427,409 +1240,5 @@ if (document.readyState === 'loading') {
     document.addEventListener("DOMContentLoaded", () => requestAnimationFrame(renderResultsTabNow), { once:true });
   } else {
     requestAnimationFrame(renderResultsTabNow);
-  }
-})();
-
-
-/* === v3.2.5: Save .txt formatting fix (clean tabs, stable decimals, CRLF) === */
-(function(){
-  function toNumber(x){ var n = Number(x); return Number.isFinite(n) ? n : NaN; }
-  function mpsToMph(mps){ return Number.isFinite(mps) ? mps * 2.2369362921 : NaN; }
-  function fmt(n, d){ return Number.isFinite(n) ? n.toFixed(d) : ""; }
-
-  function buildTxt(){
-    var site = (document.getElementById("site")||{}).value || "";
-    var dist = toNumber((document.getElementById("distance")||{}).value || "");
-    var date = (document.getElementById("date")||{}).value || "";
-    var junction = (document.getElementById("junction")||{}).value || "";
-    var arm = (document.getElementById("arm")||{}).value || "";
-
-    var rows = Array.from(document.querySelectorAll("#resultsTable tbody tr"));
-    var lines = [];
-    var EOL = "\r\n"; // ensure good Windows/Notepad rendering
-
-    lines.push("MOVA SPEED SURVEY v3.3" + EOL);
-    lines.push("Site: " + site + EOL);
-    lines.push("Junction: " + junction + EOL);
-    lines.push("Arm: " + arm + EOL);
-    lines.push("Date: " + date + EOL);
-    lines.push("Distance (m): " + (Number.isFinite(dist) ? dist : "") + EOL);
-
-    // Compute max speed from the table (fallback compute from time if needed)
-    var maxSpd = NaN;
-    rows.forEach(function(tr){
-      var tds = tr.querySelectorAll("td");
-      var t = toNumber((tds[1]?.textContent||"").trim());
-      var mps = toNumber((tds[2]?.textContent||"").trim());
-      if (!Number.isFinite(mps) && Number.isFinite(dist) && Number.isFinite(t) && t > 0){
-        mps = dist / t;
-      }
-      if (Number.isFinite(mps)){
-        if (!Number.isFinite(maxSpd) || mps > maxSpd) maxSpd = mps;
-      }
-    });
-    lines.push("Max speed: " + (Number.isFinite(maxSpd)?fmt(maxSpd,2):"") + " m/s | " + (Number.isFinite(maxSpd)?fmt(mpsToMph(maxSpd),2):"") + " mph" + EOL);
-
-    // Mirror the chip's quality text exactly
-    var chip = document.getElementById("qualityInline");
-    var qText = "—";
-    if (chip){
-      var t = (chip.textContent || "").trim();
-      var i = t.indexOf(":");
-      qText = (i >= 0 ? t.slice(i+1) : t).trim() || "—";
-    }
-    lines.push("Quality: " + qText + EOL);
-
-    lines.push(EOL);
-    lines.push("#\tTime (s)\tSpeed (m/s)\tSpeed (mph)" + EOL);
-
-    rows.forEach(function(tr, i){
-      var tds = tr.querySelectorAll("td");
-      var t = toNumber((tds[1]?.textContent||"").trim());
-      var mps = toNumber((tds[2]?.textContent||"").trim());
-      if (!Number.isFinite(mps) && Number.isFinite(dist) && Number.isFinite(t) && t > 0){
-        mps = dist / t;
-      }
-      var mph = mpsToMph(mps);
-      // Strict tab-separated columns with fixed decimals, no extra spaces
-      lines.push((i+1) + "\t" + fmt(t,2) + "\t" + fmt(mps,2) + "\t" + fmt(mph,2) + EOL);
-    });
-
-    return lines.join("");
-  }
-
-  function installSaveFix(){
-    var btn = document.getElementById("saveResultsBtn");
-    if (!btn) return;
-    // Capture-phase handler to override any earlier saves cleanly
-    btn.addEventListener("click", function(ev){
-      try{
-        ev.preventDefault(); ev.stopImmediatePropagation();
-        var txt = buildTxt();
-        var site = (document.getElementById("site")||{}).value || "mova_survey";
-        var blob = new Blob([txt], {type:"text/plain;charset=utf-8"});
-        var a = document.createElement("a");
-        a.download = site + "_" + Date.now() + ".txt";
-        a.href = URL.createObjectURL(blob);
-        a.click();
-        URL.revokeObjectURL(a.href);
-      }catch(e){ console.error(e); }
-    }, true);
-  }
-
-  if (document.readyState === "loading"){
-    document.addEventListener("DOMContentLoaded", installSaveFix);
-  } else {
-    installSaveFix();
-  }
-})();
-
-
-/* === v3.2.6: Monospaced, user-readable .txt export with aligned columns ===
-   - Fixed-width, right-aligned numeric columns
-   - CRLF line endings for Notepad compatibility
-   - Exactly one space after ':' in labels
-   - Mirrors chip quality, and uses current results values
-*/
-(function(){
-  function toNumber(x){ var n = Number(x); return Number.isFinite(n) ? n : NaN; }
-  function fmt(n, d){ return Number.isFinite(n) ? n.toFixed(d) : ""; }
-  function mphFrom(mps){ return Number.isFinite(mps) ? mps * 2.2369362921 : NaN; }
-  function padLeft(s, w){ s = String(s); return s.length >= w ? s : " ".repeat(w - s.length) + s; }
-  function padRight(s, w){ s = String(s); return s.length >= w ? s : s + " ".repeat(w - s.length); }
-
-  function chipQualityText(){
-    var chip = document.getElementById("qualityInline");
-    if (!chip) return "—";
-    var t = (chip.textContent || "").trim();
-    var i = t.indexOf(":");
-    return (i >= 0 ? t.slice(i+1) : t).trim() || "—";
-  }
-
-  function collectRows(){
-    var dist = toNumber((document.getElementById("distance")||{}).value || "");
-    var trs = Array.from(document.querySelectorAll("#resultsTable tbody tr"));
-    return trs.map(function(tr, i){
-      var tds = tr.querySelectorAll("td");
-      var t = toNumber((tds[1]?.textContent||"").trim());
-      var mps = toNumber((tds[2]?.textContent||"").trim());
-      if (!Number.isFinite(mps) && Number.isFinite(dist) && Number.isFinite(t) && t > 0){
-        mps = dist / t;
-      }
-      var mph = mphFrom(mps);
-      return {
-        idx: i + 1,
-        time: Number.isFinite(t) ? t : NaN,
-        mps: Number.isFinite(mps) ? mps : NaN,
-        mph: Number.isFinite(mph) ? mph : NaN
-      };
-    });
-  }
-
-  function buildMonospaceTxt(){
-    var EOL = "\r\n";
-    var site = (document.getElementById("site")||{}).value || "";
-    var date = (document.getElementById("date")||{}).value || "";
-    var junction = (document.getElementById("junction")||{}).value || "";
-    var arm = (document.getElementById("arm")||{}).value || "";
-    var dist = toNumber((document.getElementById("distance")||{}).value || "");
-
-    var rows = collectRows();
-    var speeds = rows.map(r => r.mps).filter(Number.isFinite);
-    var maxSpd = speeds.length ? Math.max.apply(null, speeds) : NaN;
-    var avgSpd = speeds.length ? speeds.reduce((a,b)=>a+b,0)/speeds.length : NaN;
-    // Percentiles
-    function percentile(sorted, p){
-      if (!sorted.length) return NaN;
-      var rank = (p/100) * (sorted.length - 1);
-      var lo = Math.floor(rank), hi = Math.ceil(rank);
-      if (lo === hi) return sorted[lo];
-      var t = rank - lo;
-      return sorted[lo]*(1-t) + sorted[hi]*t;
-    }
-    var sorted = speeds.slice().sort((a,b)=>a-b);
-    var p85 = percentile(sorted, 85);
-    var p15 = percentile(sorted, 15);
-    var p05 = percentile(sorted, 5);
-
-    // Header
-    var out = [];
-    out.push("MOVA SPEED SURVEY v3.3" + EOL);
-    out.push("Site: " + site + EOL);
-    out.push("Junction: " + junction + EOL);
-    out.push("Arm: " + arm + EOL);
-    out.push("Date: " + date + EOL);
-    out.push("Distance (m): " + (Number.isFinite(dist) ? dist : "") + EOL);
-    out.push(EOL);
-
-    // Summary (aligned label column)
-    var summary = [
-      ["Average speed", fmt(avgSpd,2) + " m/s | " + fmt(mphFrom(avgSpd),2) + " mph"],
-      ["85th percentile", fmt(p85,2) + " m/s | " + fmt(mphFrom(p85),2) + " mph"],
-      ["15th percentile", fmt(p15,2) + " m/s | " + fmt(mphFrom(p15),2) + " mph"],
-      ["5th percentile",  fmt(p05,2) + " m/s | " + fmt(mphFrom(p05),2) + " mph"],
-      ["Max speed",       fmt(maxSpd,2) + " m/s | " + fmt(mphFrom(maxSpd),2) + " mph"],
-      ["Quality",         chipQualityText()]
-    ];
-    var maxLabel = summary.reduce((m, r)=>Math.max(m, r[0].length), 0);
-    out.push("Results Summary" + EOL);
-    summary.forEach(function(row){
-      var label = padRight(row[0], maxLabel);
-      out.push(label + ": " + row[1] + EOL);
-    });
-    out.push(EOL);
-
-    // Table
-    // Determine widths
-    var wIdx = Math.max(1, String(rows.length || 1).length);
-    var wTime = Math.max("Time (s)".length, 7);
-    var wMps  = Math.max("Speed (m/s)".length, 11);
-    var wMph  = Math.max("Speed (mph)".length, 11);
-
-    // Build header and separator
-    var header = [
-      padRight("#", wIdx),
-      padRight("Time (s)", wTime),
-      padRight("Speed (m/s)", wMps),
-      padRight("Speed (mph)", wMph)
-    ].join("  ");
-    var sep = [
-      "-".repeat(wIdx),
-      "-".repeat(wTime),
-      "-".repeat(wMps),
-      "-".repeat(wMph)
-    ].join("  ");
-    out.push(header + EOL);
-    out.push(sep + EOL);
-
-    // Rows
-    rows.forEach(function(r){
-      var cIdx = padLeft(r.idx, wIdx);
-      var cTime = padLeft(fmt(r.time,2), wTime);
-      var cMps  = padLeft(fmt(r.mps,2), wMps);
-      var cMph  = padLeft(fmt(r.mph,2), wMph);
-      out.push([cIdx, cTime, cMps, cMph].join("  ") + EOL);
-    });
-
-    return out.join("");
-  }
-
-  function installMonospaceSave(){
-    var btn = document.getElementById("saveResultsBtn");
-    if (!btn) return;
-    btn.addEventListener("click", function(ev){
-      try{
-        ev.preventDefault(); ev.stopImmediatePropagation();
-        var txt = buildMonospaceTxt();
-        var site = (document.getElementById("site")||{}).value || "mova_survey";
-        var blob = new Blob([txt], {type:"text/plain;charset=utf-8"});
-        var a = document.createElement("a");
-        a.download = site + "_" + Date.now() + ".txt";
-        a.href = URL.createObjectURL(blob);
-        a.click();
-        URL.revokeObjectURL(a.href);
-      }catch(e){ console.error(e); }
-    }, true);
-  }
-
-  if (document.readyState === "loading"){
-    document.addEventListener("DOMContentLoaded", installMonospaceSave);
-  } else {
-    installMonospaceSave();
-  }
-})();
-
-
-/* === v3.2.7: Force single save handler (remove old listeners) + hard CRLF === */
-(function(){
-  function installSingleSaveHandler(buildTxtFn){
-    var old = document.getElementById("saveResultsBtn");
-    if (!old) return;
-    // Replace the button node to drop any previously attached listeners
-    var parent = old.parentNode;
-    var clone = old.cloneNode(true);
-    clone.id = "saveResultsBtn"; // keep same id
-    parent.replaceChild(clone, old);
-
-    function doSave(ev){
-      try{
-        ev.preventDefault(); ev.stopImmediatePropagation();
-        var txt = buildTxtFn();
-        // Ensure literal CRLF newlines in the Blob
-        txt = txt.replace(/\r?\n/g, "\r\n");
-        var site = (document.getElementById("site")||{}).value || "mova_survey";
-        var blob = new Blob([txt], {type:"text/plain;charset=utf-8"});
-        var a = document.createElement("a");
-        a.download = site + "_" + Date.now() + ".txt";
-        a.href = URL.createObjectURL(blob);
-        a.click();
-        URL.revokeObjectURL(a.href);
-      }catch(e){ console.error(e); }
-    }
-    // Attach our single authoritative handler
-    clone.addEventListener("click", doSave, true);
-  }
-
-  // If our v3.2.6 builder exists, wire it up via the single handler
-  if (typeof window !== "undefined"){
-    var install = function(){
-      if (typeof buildMonospaceTxt === "function"){
-        installSingleSaveHandler(buildMonospaceTxt);
-      }
-    };
-    if (document.readyState === "loading"){
-      document.addEventListener("DOMContentLoaded", install);
-    } else {
-      install();
-    }
-  }
-})();
-
-
-/* === v3.3: Readable line-by-line save (true CRLF, aligned) === */
-(function(){
-  function toNumber(x){ const n=Number(x); return Number.isFinite(n)?n:NaN; }
-  function fmt(n,d){ return Number.isFinite(n)? n.toFixed(d):""; }
-  function mph(mps){ return Number.isFinite(mps)? mps*2.2369362921:NaN; }
-  function padR(s,w){ s=String(s); return s.length>=w? s : s+" ".repeat(w-s.length); }
-  function padL(s,w){ s=String(s); return s.length>=w? s : " ".repeat(w-s.length)+s; }
-
-  function chipQualityText(){
-    const chip=document.getElementById("qualityInline");
-    if(!chip) return "—";
-    const t=(chip.textContent||"").trim();
-    const i=t.indexOf(":");
-    return (i>=0?t.slice(i+1):t).trim()||"—";
-  }
-
-  function collectRows(){
-    const dist=toNumber((document.getElementById("distance")||{}).value||"");
-    const trs=Array.from(document.querySelectorAll("#resultsTable tbody tr"));
-    return trs.map((tr,i)=>{
-      const tds=tr.querySelectorAll("td");
-      const t=toNumber((tds[1]?.textContent||"").trim());
-      let mps=toNumber((tds[2]?.textContent||"").trim());
-      if(!Number.isFinite(mps)&&Number.isFinite(t)&&t>0&&Number.isFinite(dist)) mps=dist/t;
-      return { idx:i+1, t, mps, mph:mph(mps) };
-    });
-  }
-
-  function buildText(){
-    const EOL = "\r\n";
-    const lines = [];
-
-    const site=(document.getElementById("site")||{}).value||"";
-    const junction=(document.getElementById("junction")||{}).value||"";
-    const arm=(document.getElementById("arm")||{}).value||"";
-    const date=(document.getElementById("date")||{}).value||"";
-    const dist=toNumber((document.getElementById("distance")||{}).value||"");
-
-    const rows=collectRows();
-    const speeds=rows.map(r=>r.mps).filter(Number.isFinite);
-    const maxSpd=speeds.length?Math.max(...speeds):NaN;
-    const avg=speeds.length?speeds.reduce((a,b)=>a+b,0)/speeds.length:NaN;
-    const sd=(function(){
-      if(speeds.length<2) return NaN;
-      const m=avg; const v=speeds.reduce((a,b)=>a+(b-m)**2,0)/(speeds.length-1);
-      return Math.sqrt(v);
-    })();
-
-    const labelW = 18;
-
-    lines.push("MOVA SPEED SURVEY v3.3");
-    lines.push("");
-    lines.push(padR("Site",labelW)+": "+site);
-    lines.push(padR("Junction",labelW)+": "+junction);
-    lines.push(padR("Arm",labelW)+": "+arm);
-    lines.push(padR("Date",labelW)+": "+date);
-    lines.push(padR("Distance (m)",labelW)+": "+(Number.isFinite(dist)?dist:""));
-    lines.push(padR("Max speed",labelW)+": "+fmt(maxSpd,2)+" m/s | "+fmt(mph(maxSpd),2)+" mph");
-    lines.push("");
-    lines.push(padR("Standard deviation (m/s)",labelW)+": "+fmt(sd,3));
-    lines.push(padR("Quality",labelW)+": "+chipQualityText());
-    lines.push("");
-
-    // Tabular data (tabs + padded numeric columns for monospaced editors)
-    const wTime=7, wMps=11, wMph=11;
-    lines.push("#\tTime (s)\tSpeed (m/s)\tSpeed (mph)");
-    rows.forEach(r=>{
-      lines.push(
-        r.idx + "\t" +
-        padL(fmt(r.t,2), wTime) + "\t" +
-        padL(fmt(r.mps,2), wMps) + "\t" +
-        padL(fmt(r.mph,2), wMph)
-      );
-    });
-
-    // Join with TRUE CRLF newlines
-    return lines.join(EOL);
-  }
-
-  function installSave(){
-    const btn=document.getElementById("saveResultsBtn");
-    if(!btn) return;
-    const parent=btn.parentNode;
-    const clone=btn.cloneNode(true);
-    parent.replaceChild(clone, btn);
-
-    clone.addEventListener("click", (ev)=>{
-      try{
-        ev.preventDefault(); ev.stopImmediatePropagation();
-        const text = buildText();
-        const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
-        const site=(document.getElementById("site")||{}).value||"mova_survey";
-        const a=document.createElement("a");
-        a.download = site + "_" + Date.now() + ".txt";
-        a.href = URL.createObjectURL(blob);
-        a.click();
-        URL.revokeObjectURL(a.href);
-      }catch(e){ console.error(e); }
-    }, true);
-  }
-
-  if (document.readyState === "loading"){
-    document.addEventListener("DOMContentLoaded", installSave, { once:true });
-  } else {
-    installSave();
   }
 })();
