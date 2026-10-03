@@ -1,5 +1,10 @@
-# MovaSpeed
-HTML document for performing MOVA speed surveys
+# MOVA Speed Survey v3.4
+
+Current app: https://dk429.github.io/mova_speedsurvey/
+
+Mobile survey app with the larger timing control, latest-sample display,
+expandable sample tables, complete data exports and corrected maximum speed
+and standard deviation.
 
 ## Mobile layout regression check
 

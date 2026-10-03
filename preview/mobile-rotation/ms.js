@@ -378,7 +378,7 @@ function renderSummaryBox() {
 }
 
 function buildTxtContent() {
-  var lines = ['MOVA SPEED SURVEY v3.4', '', 'JUNCTION DETAILS'];
+  var lines = ['MOVA SPEED SURVEY v3.3', '', 'JUNCTION DETAILS'];
   lines.push('Site Number        : ' + (siteInput.value || 'N/A'));
   lines.push('Junction Location  : ' + (junctionInput.value || 'N/A'));
   lines.push('Arm                : ' + (armInput.value || 'N/A'));
