@@ -58,6 +58,14 @@ input.invalid[data-touched] + .field-error { display: block; }
 .quality-low { background: #fff2d6; color: #755000; border-color: #e8d4a4; }
 .quality-fair { background: #e6f1ff; color: #194e87; border-color: #c6dbf1; }
 .quality-good, .quality-vgood { background: #e6f5e9; color: #205b2c; border-color: #bfdcc5; }
+.latest-sample { margin-top: 16px; padding: 12px; border: 1px solid #c4d5e9; border-radius: 10px; background: #edf3fb; }
+.latest-sample-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 8px; margin-bottom: 8px; }
+.latest-sample-heading h2 { margin: 0; font-size: 16px; }
+#latestSampleNumber { font-size: 13px; color: var(--muted); }
+.latest-sample-values { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; font-variant-numeric: tabular-nums; }
+.latest-sample-values > span { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; }
+.latest-sample-values strong { font-size: 20px; }
+.latest-sample-values small { font-size: 13px; color: var(--muted); }
 .measurement-actions { text-align: center; margin: 16px 0 24px; }
 #measureBtn { display: block; flex: none; width: 164px; height: 164px; min-height: 164px; max-width: 164px; padding: 0; margin: 0 auto; border: 0; border-radius: 50%; color: #fff; font-size: 30px; font-weight: 700; box-shadow: 0 4px 12px #183b2726; user-select: none; -webkit-user-select: none; }
 #measureBtn[data-state="start"]:not(.btn-disabled) { background: #2e7d32 !important; }

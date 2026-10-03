@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MOVA Speed Survey — Test Version</title>
   <meta name="robots" content="noindex, nofollow">
-  <link rel="stylesheet" href="ms.css?v=6365c52">
+  <link rel="stylesheet" href="ms.css?v=e991db0">
 </head>
 <body>
 <main class="app-shell">
@@ -69,6 +69,15 @@
         </div>
       </div>
 
+      <section class="latest-sample" aria-labelledby="latestSampleHeading" aria-live="polite" aria-atomic="true">
+        <div class="latest-sample-heading"><h2 id="latestSampleHeading">Last sample</h2><span id="latestSampleNumber">No sample yet</span></div>
+        <div class="latest-sample-values">
+          <span><strong id="latestSampleTime">—</strong><small>s</small></span>
+          <span><strong id="latestSampleMps">—</strong><small>m/s</small></span>
+          <span><strong id="latestSampleMph">—</strong><small>mph</small></span>
+        </div>
+      </section>
+
       <div class="measurement-actions">
         <button id="measureBtn" type="button" class="btn-disabled" style="background-color:#999;" title="Start or stop timing"
                 onclick="if(window.toggleHandler){window.toggleHandler(event);} return false;">Start</button>
@@ -128,7 +137,7 @@
   </div>
 
 </main>
-  <script src="ms.js?v=6365c52"></script>
-  <script src="layout.js?v=6365c52"></script>
+  <script src="ms.js?v=e991db0"></script>
+  <script src="layout.js?v=e991db0"></script>
 </body>
 </html>
