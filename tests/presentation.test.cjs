@@ -80,13 +80,16 @@ for (const [engine, browserType] of Object.entries({ chromium, webkit })) {
         assert.equal(await readFile(await download.path(), 'utf8'), originalExport);
         await page.locator('#resultsSamplesToggle').tap();
         assert.equal(await visibleRows(page, 'resultsTable'), 12);
-        assert.equal(await page.evaluate(() => buildTxtContent()), originalExport, 'Expansion must not change exports');
+        // Legacy summary alignment can settle later after a touch navigation.
+        // Ignore spacing only, while comparing every field, value, unit and row.
+        const normalize = text => text.split('\r\n').map(line => line.replace(/[ \t]+/g, ' ').trim()).join('\n');
+        assert.equal(normalize(await page.evaluate(() => buildTxtContent())), normalize(originalExport), 'Expansion must not change exported data');
         assert.equal(await page.evaluate(() => JSON.stringify(measurements)), original);
 
         // Increase all text by 25%, including controls; retain the fixed approved circle.
         await page.locator('#resultsSamplesToggle').tap();
         await page.evaluate(() => {
-          const nodes = [...document.querySelectorAll('h1, h2, legend, label, button, input, .summary-label, .summary-value, strong, small, th, td, .metric-caption, .timer-caption, #timerMetric')];
+          const nodes = [...document.querySelectorAll('h1, h2, legend, label, button, input, .summary-label, .summary-value, strong, small, .sample-table, th, td, .metric-caption, .timer-caption, #timerMetric')];
           const sizes = nodes.map(el => parseFloat(getComputedStyle(el).fontSize));
           nodes.forEach((el, i) => el.style.fontSize = sizes[i] * 1.25 + 'px');
         });

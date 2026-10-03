@@ -22,6 +22,7 @@
     let lastSummary = '';
     let lastTab = '';
     let queued = false;
+    let previousCount = 0;
 
     function speedPair(target, value) {
       if (target.dataset.value === value) return;
@@ -61,6 +62,14 @@
     function render() {
       queued = false;
       const samples = typeof measurements === 'undefined' ? [] : measurements;
+      if (previousCount > 0 && samples.length === 0) {
+        document.querySelectorAll('.sample-section').forEach(section => section.classList.remove('expanded'));
+        if (!byId('site').value && !byId('junction').value && !byId('arm').value && !byId('distance').value) {
+          document.querySelectorAll('#detailsTab input').forEach(input => delete input.dataset.touched);
+          delete byId('detailsTab').dataset.edited;
+        }
+      }
+      previousCount = samples.length;
       const signature = samples.map(m => [m.time, m.speed, m.mph].join(',')).join(';');
       if (signature !== lastSamples || !measureTable.dataset.ready) {
         lastSamples = signature;
@@ -82,6 +91,11 @@
       syncToggle(measureTable, measureToggle, samples.length);
       syncToggle(resultsTable, resultsToggle, resultsTable.tBodies[0].rows.length);
       byId('resultsSampleCount').textContent = samples.length + (samples.length === 1 ? ' sample' : ' samples');
+      byId('resultsContext').textContent = [
+        byId('site').value ? 'Site ' + byId('site').value : '',
+        byId('junction').value,
+        byId('arm').value
+      ].filter(Boolean).join(' · ');
       speedPair(byId('avgDisplay'), byId('avgMetric').textContent.trim());
       speedPair(byId('p85Display'), byId('p85Metric').textContent.trim());
       byId('measureBtn').dataset.state = byId('measureBtn').textContent.trim().toLowerCase();
@@ -130,6 +144,15 @@
     observer.observe(document.querySelector('.summary'), { childList: true, characterData: true, subtree: true });
     observer.observe(resultsTable.tBodies[0], { childList: true, subtree: true });
     document.querySelectorAll('.tab-btn').forEach(button => observer.observe(button, { attributes: true, attributeFilter: ['class'] }));
+    document.querySelectorAll('#detailsTab input').forEach(input => {
+      const touched = () => {
+        input.dataset.touched = 'true';
+        byId('detailsTab').dataset.edited = 'true';
+        schedule();
+      };
+      input.addEventListener('input', touched);
+      input.addEventListener('focusout', touched);
+    });
     render();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
