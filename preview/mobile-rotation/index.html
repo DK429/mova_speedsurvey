@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MOVA SPEED SURVEY v3.3 — TEST VERSION</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="stylesheet" href="ms.css?v=e7de633">
+</head>
+<body>
+  <h2>MOVA SPEED SURVEY v3.3 — TEST VERSION</h2>
+  <p class="helper" role="note">Mobile rotation fix preview. <a href="../../">Open the current survey</a>.</p>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="detailsTab" id="detailsTabBtn" type="button">1. Junction Details</button>
+    <button class="tab-btn" data-tab="measureTab" id="measureTabBtn" type="button" disabled aria-disabled="true" title="Complete Junction Details first">2. Measurements</button>
+    <button class="tab-btn" data-tab="resultsTab" id="resultsTabBtn" type="button" disabled aria-disabled="true" title="Press End Survey to view results">3. Results</button>
+  </div>
+
+  <div id="detailsTab" class="tab-content">
+    <fieldset>
+      <legend>Junction Details</legend>
+      <div class="row">
+        <label for="site">Site Number:</label>
+        <input type="text" id="site" maxlength="7" placeholder="e.g. 12A34BC" pattern="[A-Za-z0-9]{1,7}" title="Up to 7 letters/numbers, no spaces">
+      </div>
+      <div class="row">
+        <label for="junction">Junction Location:</label>
+        <input type="text" id="junction" placeholder="e.g. A645 / A638">
+      </div>
+      <div class="row">
+        <label for="arm">Arm:</label>
+        <input type="text" id="arm" placeholder="e.g. Northbound">
+      </div>
+      <div class="row">
+        <label for="date">Date:</label>
+        <input type="date" id="date">
+      </div>
+      <div class="row">
+        <label for="distance">Distance (m):</label>
+        <input type="number" id="distance" placeholder="e.g. 100" min="0" step="0.1">
+      </div>
+      <p id="detailsErrors" class="error-msg">Please check the highlighted fields.</p>
+    </fieldset>
+    <p class="helper" id="detailsHint">Fill all fields to unlock Measurements.</p>
+    <div style="text-align:center;">
+      <button id="gotoMeasureBtn" type="button" disabled aria-disabled="true">Go to Measurements ▶</button>
+    </div>
+  </div>
+
+  <div id="measureTab" class="tab-content hidden" aria-hidden="true">
+    <fieldset>
+      <legend>Measurement</legend>
+
+      <div class="metrics-bar-top" aria-live="polite">
+        <div class="metrics-row metrics-row--top">
+          <div class="metric"><span class="label">Samples</span><span class="value" id="countMetric">0</span></div>
+          <span id="qualityInline" class="quality-chip">Quality: —</span>
+        </div>
+        <div class="metrics-row">
+          <div class="metric"><span class="label">Timer</span><span class="value" id="timerMetric">0.00 s</span></div>
+        </div>
+      </div>
+
+      <div class="canvas-wrap" id="canvasWrap">
+        <canvas id="canvas" width="460" height="240"></canvas>
+      </div>
+
+      <div style="text-align:center; margin-top: 6px;">
+        <button id="measureBtn" type="button" class="btn-disabled" style="background-color:#999;" title="Start or stop timing"
+                onclick="if(window.toggleHandler){window.toggleHandler(event);} return false;">Start</button>
+        <button id="deleteLastBtn" type="button">Delete Last Sample</button>
+      </div>
+
+      <div class="metrics-bar" id="metricsBottom" aria-live="polite" style="border-bottom:none;">
+        <div class="metric"><span class="label">Avg Spd</span><span class="value" id="avgMetric">— m/s | — mph</span></div>
+        <div class="metric"><span class="label">85%</span><span class="value" id="p85Metric">— m/s | — mph</span></div>
+      </div>
+    </fieldset>
+    <p class="helper one-line">Click End Survey to see results.</p>
+    <div style="text-align:center;">
+      <button id="endSurveyBtn" type="button">End Survey</button>
+    </div>
+  </div>
+
+  <div id="resultsTab" class="tab-content hidden" aria-hidden="true">
+    <div class="summary">
+      <h3>Results Summary</h3>
+      <span id="resultAvg"></span>
+      <span id="resultP85"></span>
+      <span id="resultP15"></span>
+      <span id="resultP05"></span>
+    </div>
+
+    <div class="results-table-wrap">
+      <table id="resultsTable" class="results-fixed">
+        <colgroup>
+          <col style="width:5ch;"><col style="width:10ch;"><col style="width:12ch;"><col style="width:12ch;">
+        </colgroup>
+        <thead>
+          <tr><th>#</th><th>Time (s)</th><th>Speed (m/s)</th><th>Speed (mph)</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div style="text-align:center; margin-top: 10px;">
+      <button id="saveResultsBtn" type="button">Save Data (.txt)</button>
+      <button id="clearDataBtn" type="button">Clear All</button>
+    </div>
+  </div>
+
+  <script src="ms.js?v=e7de633"></script>
+</body>
+</html>
