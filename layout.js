@@ -85,6 +85,11 @@
           rows.appendChild(row);
         });
         measureTable.tBodies[0].replaceChildren(rows);
+        const latest = samples[samples.length - 1];
+        byId('latestSampleNumber').textContent = latest ? 'Sample ' + samples.length : 'No sample yet';
+        byId('latestSampleTime').textContent = latest ? latest.time.toFixed(2) : '—';
+        byId('latestSampleMps').textContent = latest ? latest.speed.toFixed(2) : '—';
+        byId('latestSampleMph').textContent = latest ? latest.mph.toFixed(2) : '—';
       }
       byId('measureSamplesEmpty').hidden = samples.length > 0;
       measureTable.hidden = samples.length === 0;

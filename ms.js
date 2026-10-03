@@ -53,6 +53,7 @@ var startTime = 0;
 var rafId = null;
 var measurements = [];
 var resultsUnlocked = false;
+var renderExtraSummary = function() {};
 
 /* ===== Metric label alignment ===== */
 function alignMetricGroup(labelNodes) {
@@ -373,6 +374,7 @@ function renderSummaryBox() {
   resultP85.textContent = lines[1];
   resultP15.textContent = lines[2];
   resultP05.textContent = lines[3];
+  renderExtraSummary(speeds);
 }
 
 function buildTxtContent() {
@@ -490,6 +492,7 @@ function clearAllAndReset() {
   timerMetric.textContent = '0.00 s';
   renderResultsTable();
   renderResultsPlaceholders();
+  renderExtraSummary([]);
   renderDisplay();
   updateEndSurveyColor();
   updateMetricsBars();
@@ -537,6 +540,7 @@ function onReady(){
   }
   resizeCanvas();
   renderResultsPlaceholders();
+  renderExtraSummary([]);
   renderDisplay();
   updateTabVisibility();
   updateMetricsBars();
@@ -591,7 +595,6 @@ if (document.readyState === 'loading') {
 
 /* ===== Extra Results Metrics + Save Enhancements (2025-10-12) ===== */
 (function(){
-  function toNumber(x){ var n = Number(x); return Number.isFinite(n) ? n : NaN; }
   function mpsToMph(mps){ return Number.isFinite(mps) ? mps * 2.2369362921 : NaN; }
   function mean(arr){ return arr.length ? arr.reduce((a,b)=>a+b,0) / arr.length : NaN; }
   function sampleSD(arr){
@@ -643,43 +646,19 @@ if (document.readyState === 'loading') {
     };
   }
 
-  function parseSpeedsFromTable(){
-    var rows = Array.from(document.querySelectorAll("#resultsTable tbody tr"));
-    var speeds = [];
-    rows.forEach(function(tr){
-      var tds = tr.querySelectorAll("td");
-      if (tds.length >= 4){
-        var mps = toNumber((tds[2].textContent || "").trim());
-        if (Number.isFinite(mps)) speeds.push(mps);
-      }
-    });
-    return speeds;
-  }
-
-  function computeAndRenderExtraSummary(){
+  // Use every retained, full-precision sample. This runs synchronously from
+  // renderSummaryBox for touch, mouse and keyboard navigation alike.
+  renderExtraSummary = function(speeds){
     var spans = ensureSummarySpans();
-    var speeds = parseSpeedsFromTable();
     var max = speeds.length ? Math.max.apply(null, speeds) : NaN;
+    var sd = sampleSD(speeds);
     var q = qualityFromSpeeds(speeds);
     if (spans.max) spans.max.textContent = "Max speed: " + fmtSpeedPair(max);
-    if (spans.sd) spans.sd.textContent = "Standard deviation: " + fmtFixed(q.sd, 3) + " m/s";
+    // SD is a statistic, independent of count-based quality classification.
+    if (spans.sd) spans.sd.textContent = "Standard deviation: " + fmtFixed(sd, 3) + " m/s";
     if (spans.qual) spans.qual.textContent = "Quality: " + q.label;
-
     if (window.__formatSummaryAlignment){ window.__formatSummaryAlignment(); }
-  }
-
-  // Hook events
-  ["click"].forEach(function(evt){
-    var endBtn = document.getElementById("endSurveyBtn");
-    if (endBtn){ endBtn.addEventListener(evt, function(){ setTimeout(computeAndRenderExtraSummary, 0); }); }
-    var resBtn = document.getElementById("resultsTabBtn");
-    if (resBtn){ resBtn.addEventListener(evt, function(){ setTimeout(computeAndRenderExtraSummary, 0); }); }
-  });
-  if (document.readyState === "loading"){
-    document.addEventListener("DOMContentLoaded", function(){ setTimeout(computeAndRenderExtraSummary, 0); });
-  } else {
-    setTimeout(computeAndRenderExtraSummary, 0);
-  }
+  };
 
 
 })();

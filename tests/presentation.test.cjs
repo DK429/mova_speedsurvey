@@ -51,6 +51,12 @@ for (const [engine, browserType] of Object.entries({ chromium, webkit })) {
         const last = await page.locator('#measureSamplesTable tbody tr').last().boundingBox();
         const previous = await page.locator('#measureSamplesTable tbody tr').nth(10).boundingBox();
         assert.ok(last.y < previous.y, 'Newest sample must be first');
+        const latestCard = await page.locator('.latest-sample').boundingBox();
+        assert.ok(latestCard.y + latestCard.height <= timingRect.y && timingRect.y - latestCard.y - latestCard.height <= 20, 'Last sample must be directly above Start/Stop');
+        assert.equal(await page.locator('#latestSampleNumber').textContent(), 'Sample 12');
+        assert.equal(await page.locator('#latestSampleTime').textContent(), (25 / 20.6).toFixed(2));
+        assert.equal(await page.locator('#latestSampleMps').textContent(), '20.60');
+        assert.equal(await page.locator('#latestSampleMph').textContent(), (20.6 * 2.23694).toFixed(2));
         await screenshot(page, `${engine}-${width}-measure`);
         await page.locator('#measureSamplesToggle').tap();
         assert.equal(await visibleRows(page, 'measureSamplesTable'), 12);
@@ -72,6 +78,8 @@ for (const [engine, browserType] of Object.entries({ chromium, webkit })) {
           return source === visible;
         }));
         assert.ok(summaryMatches, 'Structured summary must preserve every existing value and unit');
+        assert.match(await page.locator('[data-source="resultMax"]').textContent(), /20\.60/);
+        assert.match(await page.locator('[data-source="resultSD"]').textContent(), /2\.163 m\/s/);
         await screenshot(page, `${engine}-${width}-results`);
         const originalExport = await page.evaluate(() => buildTxtContent());
         const pending = page.waitForEvent('download');

@@ -66,6 +66,15 @@
         </div>
       </div>
 
+      <section class="latest-sample" aria-labelledby="latestSampleHeading" aria-live="polite" aria-atomic="true">
+        <div class="latest-sample-heading"><h2 id="latestSampleHeading">Last sample</h2><span id="latestSampleNumber">No sample yet</span></div>
+        <div class="latest-sample-values">
+          <span><strong id="latestSampleTime">—</strong><small>s</small></span>
+          <span><strong id="latestSampleMps">—</strong><small>m/s</small></span>
+          <span><strong id="latestSampleMph">—</strong><small>mph</small></span>
+        </div>
+      </section>
+
       <div class="measurement-actions">
         <button id="measureBtn" type="button" class="btn-disabled" style="background-color:#999;" title="Start or stop timing"
                 onclick="if(window.toggleHandler){window.toggleHandler(event);} return false;">Start</button>

@@ -34,3 +34,10 @@ On a physical phone, complete Junction Details, open Measurements, and rotate
 back and forth several times before and during timing. Check that Start/Stop,
 Delete Last Sample, and End Survey remain within the screen width and reachable
 by scrolling. End the survey and repeat the rotation check on Results.
+
+The Last sample card sits immediately above Start/Stop, shows elapsed time and
+both speed units, and updates after recording, deleting or clearing samples.
+Maximum speed and sample standard deviation refresh synchronously when Results
+opens by touch, mouse or keyboard, using all retained full-precision samples.
+Standard deviation uses n−1; one sample displays unavailable SD, and identical
+samples display zero. Quality continues to use the existing count thresholds.
