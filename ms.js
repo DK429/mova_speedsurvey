@@ -606,22 +606,6 @@ if (document.readyState === 'loading') {
     v /= (n-1);
     return Math.sqrt(v);
   }
-  function qualityFromSpeeds(speeds){
-    // Placeholder; overridden by final quality patch below
-    var n = speeds.length;
-    if (n === 0) return {label:"—", cls:""};
-    var mu = mean(speeds);
-    var sd = sampleSD(speeds);
-    var cov = (mu>0 && Number.isFinite(sd)) ? (sd/mu) : Infinity;
-    var label = "Fair", cls = "quality-fair";
-    if (n < 5){ label = "Low"; cls = "quality-low"; }
-    else if (cov < 0.05){ label = "Very Good"; cls = "quality-vgood"; }
-    else if (cov < 0.12){ label = "Good"; cls = "quality-good"; }
-    else if (cov < 0.25){ label = "Fair"; cls = "quality-fair"; }
-    else if (cov < 0.40){ label = "Low"; cls = "quality-low"; }
-    else { label = "Poor"; cls = "quality-poor"; }
-    return {label, cls, sd, cov};
-  }
   function fmtFixed(n, d){ return Number.isFinite(n) ? n.toFixed(d) : "—"; }
   function fmtSpeedPair(mps){ return fmtFixed(mps,2) + " m/s | " + fmtFixed(mpsToMph(mps),2) + " mph"; }
 
@@ -652,11 +636,12 @@ if (document.readyState === 'loading') {
     var spans = ensureSummarySpans();
     var max = speeds.length ? Math.max.apply(null, speeds) : NaN;
     var sd = sampleSD(speeds);
-    var q = qualityFromSpeeds(speeds);
+    var chip = document.getElementById("qualityInline");
+    var quality = chip ? chip.textContent.split(":").slice(1).join(":").trim() : "—";
     if (spans.max) spans.max.textContent = "Max speed: " + fmtSpeedPair(max);
     // SD is a statistic, independent of count-based quality classification.
     if (spans.sd) spans.sd.textContent = "Standard deviation: " + fmtFixed(sd, 3) + " m/s";
-    if (spans.qual) spans.qual.textContent = "Quality: " + q.label;
+    if (spans.qual) spans.qual.textContent = "Quality: " + (quality || "—");
     if (window.__formatSummaryAlignment){ window.__formatSummaryAlignment(); }
   };
 

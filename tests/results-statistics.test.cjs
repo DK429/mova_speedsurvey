@@ -15,12 +15,13 @@ async function checkStats(page, maximum, sd) {
   const sdText = await page.locator('[data-source="resultSD"] .summary-value').textContent();
   assert.ok(maxText.includes(maximum + 'm/s'), maxText);
   assert.equal(sdText, sd + ' m/s');
+  assert.equal(await page.locator('[data-source="resultQuality"] .summary-value').textContent(), 'Poor', 'Existing count-based quality must remain stable');
   const pending = page.waitForEvent('download');
   await page.locator('#saveResultsBtn').tap();
   const download = await pending;
   const text = await readFile(await download.path(), 'utf8');
   assert.match(text, new RegExp('Max speed +: ' + maximum.replace('.', '\\.') + ' m/s'));
-  assert.match(text, new RegExp('Standard deviation +: ' + sd.replace('.', '\\.') + ' m/s'));
+  assert.match(text, new RegExp('Standard deviation *: ' + sd.replace('.', '\\.') + ' m/s'));
 }
 
 for (const [engine, browserType] of Object.entries({ chromium, webkit })) {
