@@ -63,7 +63,7 @@ input.invalid[data-touched] + .field-error { display: block; }
 .latest-sample-heading h2 { margin: 0; font-size: 16px; }
 #latestSampleNumber { font-size: 13px; color: var(--muted); }
 .latest-sample-values { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; font-variant-numeric: tabular-nums; }
-.latest-sample-values > span { min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 4px; }
+.latest-sample-values > span { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; }
 .latest-sample-values strong { font-size: 20px; }
 .latest-sample-values small { font-size: 13px; color: var(--muted); }
 .measurement-actions { text-align: center; margin: 16px 0 24px; }
