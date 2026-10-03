@@ -26,7 +26,7 @@ jobs:
           node-version: '22'
       - run: npm install --no-save --package-lock=false playwright@1.56.1
       - run: npx playwright install --with-deps chromium webkit
-      - run: node --test tests/mobile-layout.test.cjs
+      - run: node --test tests/*.test.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
