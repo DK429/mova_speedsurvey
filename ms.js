@@ -171,15 +171,14 @@ addRobustTap(measureTabBtn, function(){ updateTabVisibility(); showTab('measureT
 addRobustTap(resultsTabBtn, function(){ updateTabVisibility(); showTab('resultsTab'); });
 addRobustTap(gotoMeasureBtn, function(){ updateTabVisibility(); showTab('measureTab'); });
 
-var BASE_W = 460, BASE_H = 240, BASE_RATIO = BASE_H / BASE_W;
 function resizeCanvas(){
   if (!canvas || !canvasWrap) return;
+  // CSS controls the displayed size. Never feed the previous orientation's
+  // pixel width back into the layout, which can prevent the fieldset shrinking.
+  var cssWidth = canvas.clientWidth;
+  var cssHeight = canvas.clientHeight;
+  if (!cssWidth || !cssHeight) return; // The Measurements tab may be hidden.
   var dpr = window.devicePixelRatio || 1;
-  var cssWidth = canvasWrap.clientWidth;
-  var cssHeight = Math.round(cssWidth * BASE_RATIO);
-
-  canvas.style.width = cssWidth + 'px';
-  canvas.style.height = cssHeight + 'px';
 
   canvas.width = Math.round(cssWidth * dpr);
   canvas.height = Math.round(cssHeight * dpr);
@@ -565,6 +564,12 @@ function onReady(){
   showTab('detailsTab');
 }
 window.addEventListener('resize', function(){ resizeCanvas(); alignAllMetricLabels(); }, false);
+// Observe the final container size as mobile browsers settle after rotation,
+// and when a hidden Measurements tab becomes visible again.
+if (window.ResizeObserver && canvasWrap) {
+  var canvasResizeObserver = new ResizeObserver(resizeCanvas);
+  canvasResizeObserver.observe(canvasWrap);
+}
 document.addEventListener('visibilitychange', function(){ if (!document.hidden) { resizeCanvas(); alignAllMetricLabels(); } }, false);
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', onReady, false);
