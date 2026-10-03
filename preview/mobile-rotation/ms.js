@@ -207,6 +207,15 @@ function updateQualityBadge(){
 function drawLines(lines) {
   ctx.clearRect(0,0,canvas.width,canvas.height);
   ctx.font = '16px monospace';
+  // Keep complete rows readable when the history is narrower on a phone.
+  var availableWidth = Math.max(1, canvas.clientWidth - 24);
+  var longestWidth = 0;
+  for (var lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+    longestWidth = Math.max(longestWidth, ctx.measureText(lines[lineIndex]).width);
+  }
+  if (longestWidth > availableWidth) {
+    ctx.font = (16 * availableWidth / longestWidth) + 'px monospace';
+  }
   ctx.fillStyle = '#000';
   var y = 18; // Start text near the very top of the canvas
   var x = 12;
